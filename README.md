@@ -65,9 +65,9 @@
 
 ### 第一部分：理解 WoT
 
-1. 为什么物联网平台不应该从 MQTT Topic 开始设计
-2. W3C WoT 不是一种新协议
-3. Thing Description 是语义契约，而不是设备配置文件
+1. [W3C WoT 到底解决什么问题？](./articles/01-wot-foundations/001-what-does-wot-solve.md)
+2. Thing Description 是语义契约，而不是设备配置文件
+3. 同一个 Thing 如何通过不同协议交互
 4. 一个 Thing 有多个 Form 时，运行时如何选择
 
 ### 第二部分：理解 ClinkZ-WoT
