@@ -5,7 +5,7 @@ ClinkZ-WoT 的开发计划。
 
 ## 专栏
 
-**从零设计一个 Rust WoT Runtime**
+**从零开发一个 Rust WoT 引擎**
 
 副标题：
 
@@ -15,9 +15,9 @@ ClinkZ-WoT 的开发计划。
 
 | ID | 标题 | 系列 | 状态 |
 |---|---|---|---|
-| WOT-001 | 为什么物联网平台不应该从 MQTT Topic 开始设计 | WoT 基础 | IDEA |
-| WOT-002 | W3C WoT 不是一种新协议 | WoT 基础 | IDEA |
-| WOT-003 | Thing Description 是语义契约，而不是设备配置文件 | WoT 基础 | IDEA |
+| WOT-001 | W3C WoT 到底解决什么问题？ | 重新理解 WoT | DRAFTING |
+| WOT-002 | Thing Description 是语义契约，而不是设备配置文件 | 重新理解 WoT | IDEA |
+| WOT-003 | 同一个 Thing 如何通过不同协议交互 | 重新理解 WoT | IDEA |
 | ARCH-001 | 从 TD 到一次属性读取：ClinkZ-WoT 的完整执行链 | 运行时架构 | IDEA |
 | ARCH-002 | 为什么 WoT Runtime 需要预编译执行计划 | 运行时架构 | IDEA |
 | ARCH-003 | Logical Plan 与 Binding Artifact：协议中立如何落地 | 运行时架构 | IDEA |
@@ -28,38 +28,46 @@ ClinkZ-WoT 的开发计划。
 | RUST-002 | 为什么所有队列、缓存和后台工作都必须有上限 | Rust 运行时 | IDEA |
 | AI-001 | 我如何用 AI 推进一个复杂 Rust 架构项目 | AI 工程 | IDEA |
 
-推荐先从 `WOT-001` 开始。它面向更广泛的物联网开发者，也能自然引出
-WoT、TD、Form、Planning 和 Protocol Binding。
+推荐先从 `WOT-001` 开始。第一篇先建立 WoT 自己的问题空间，不从 MQTT、HTTP
+或任何单一协议出发；之后再进入 TD、Form、Protocol Binding 和运行时执行。
 
 ---
 
-## 系列一：WoT 基础与语义模型
+## 系列一：重新理解 WoT
 
-### WOT-001｜为什么物联网平台不应该从 MQTT Topic 开始设计
-
-核心问题：
-
-- Topic 为什么是通信地址而不是业务语义；
-- 协议结构如何渗透应用；
-- Property、Action、Event 如何建立协议之上的交互模型；
-- ClinkZ-WoT 为什么从 TD 开始规划。
-
-### WOT-002｜W3C WoT 到底解决什么问题？它不是另一种物联网协议
+### WOT-001｜W3C WoT 到底解决什么问题？
 
 核心问题：
 
-- WoT 与 MQTT、HTTP、CoAP、Zenoh 的关系；
-- TD 与 Protocol Binding 的分工；
-- 为什么 WoT 是编程模型和互操作层。
+- WoT 为什么不是另一种物联网通信协议；
+- 设备已经可以通过 HTTP、MQTT、CoAP 或 Zenoh 通信后，为什么仍然存在互操作问题；
+- Thing、Interaction Affordance 和机器可读接口模型分别解决什么；
+- TD、Form、Protocol Binding 与 WoT Runtime 如何协作；
+- ClinkZ-WoT 为什么选择从 TD 开始，而不是从某个具体协议开始。
 
-### WOT-003｜Thing Description 不是设备配置文件，而是语义契约
+当前稿件：
+
+- `articles/01-wot-foundations/001-what-does-wot-solve.md`
+
+### WOT-002｜Thing Description 是语义契约，而不是设备配置文件
 
 核心问题：
 
 - Property、Action、Event；
 - DataSchema、Form、Security；
 - 扩展成员；
-- 为什么运行时连接和缓存不应进入 TD。
+- Thing Description 与 Thing Model 的边界；
+- 为什么连接池、缓存、运行时句柄和执行状态不应进入 TD。
+
+### WOT-003｜同一个 Thing 如何通过不同协议交互
+
+核心问题：
+
+- 同一项 Property、Action 或 Event 如何拥有多个 Form；
+- Protocol Binding 如何把 Interaction Affordance 映射到具体协议消息；
+- HTTP URL、MQTT Topic、CoAP resource 与 Zenoh key expression 为什么属于协议层；
+- 协议中立为什么不等于抹平 QoS、流控和交互方式差异；
+- 应用、WoT Runtime 与 Binding 分别应该知道什么。
 
 ### WOT-004｜一个 Thing 同时提供多个 Form，客户端应该选哪个
 
