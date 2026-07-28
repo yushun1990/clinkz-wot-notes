@@ -2,11 +2,12 @@
 
 <img src="./assets/covers/clinkz-wot-column-cover.png" alt="ClinkZ-WoT architecture cover" width="100%" />
 
-# 从零设计一个 Rust WoT Runtime
+# 从零开发一个 Rust WoT 引擎
 
 **ClinkZ-WoT 的架构、实现与 AI 协作开发实录**
 
 [ClinkZ-WoT 主项目](https://github.com/yushun1990/clinkz-wot) ·
+[专栏导读](./articles/00-column-guide.md) ·
 [文章计划](./CONTENT_PLAN.md) ·
 [写作规范](./EDITORIAL_GUIDE.md) ·
 [AI 协作规则](./AGENTS.md)
@@ -60,6 +61,8 @@
 
 ## 推荐阅读路线
 
+0. [专栏导读：从零开发一个 Rust WoT 引擎](./articles/00-column-guide.md)
+
 ### 第一部分：理解 WoT
 
 1. 为什么物联网平台不应该从 MQTT Topic 开始设计
@@ -104,6 +107,7 @@
 ├── AI_WORKFLOW.md
 ├── CONTRIBUTING.md
 ├── articles/
+│   ├── 00-column-guide.md
 │   ├── 01-wot-foundations/
 │   ├── 02-runtime-architecture/
 │   ├── 03-rust-runtime/
