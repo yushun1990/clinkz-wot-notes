@@ -13,7 +13,7 @@ summary: "介绍《从零开发一个 Rust WoT 引擎》专栏的写作目标、
 clinkz_wot:
   repository: "https://github.com/yushun1990/clinkz-wot"
   branch: "master"
-  commit: "1b5f319efbb1497f84d75227cab0324274d439b2"
+  commit: "6c01e07a446f51d413618474554b5eedcf5de23e"
   inspected_at: "2026-07-28"
 
 publication:
@@ -50,7 +50,7 @@ related:
 
 我想把这个过程记录下来，主要有两个原因。
 
-第一，是向更多物联网开发者介绍 W3C Web of Things。WoT 并不是一种替代 MQTT、HTTP、CoAP 或 Zenoh 的新协议，而是一套建立在具体协议之上的语义模型与运行时编程方式。
+第一，是向更多物联网开发者介绍 W3C Web of Things。WoT 并不是一种替代 MQTT、HTTP、CoAP 或 Zenoh 的新协议，而是一套建立在具体协议之上的 Thing 描述、交互模型与运行时编程方式。
 
 第二，也是更重要的原因，是逼迫自己真正理解这个项目。能让 AI 生成一段代码，不等于掌握了这段代码；能接受一份架构设计，也不等于理解了设计背后的状态、生命周期、失败路径和取舍。
 
@@ -67,9 +67,9 @@ related:
 
 ClinkZ-WoT 希望实现一个以 [W3C Thing Description](https://www.w3.org/TR/wot-thing-description11/) 为语义入口、协议中立的 Rust WoT Runtime。
 
-在传统物联网系统中，我们经常从 MQTT Topic、HTTP 路径或某个设备协议开始设计。随着系统扩大，协议中的地址结构、消息格式和调用方式会逐渐渗透到业务代码，最终让设备模型、业务语义和通信机制紧密耦合。
+物联网系统通常同时面对多种设备、厂商接口和通信方式。即使设备都能够连通，应用仍可能需要分别理解 HTTP 的资源与状态码、MQTT 的 Topic 与消息关联、CoAP 的 Observe，以及 Zenoh 的 key expression 与 query。真正缺少的不是又一种通信协议，而是位于这些接口之上的共同 Thing 交互模型。
 
-WoT 尝试把这几层重新分开：
+WoT 尝试把几个层次分开：
 
 ```text
 Thing Description
@@ -78,7 +78,7 @@ Thing Description
 Property / Action / Event
         |
         v
-protocol-neutral runtime
+Form + Protocol Binding
         |
         v
 HTTP / MQTT / CoAP / Zenoh / ...
@@ -101,13 +101,14 @@ ClinkZ-WoT 的目标，就是探索这套模型如何在 Rust 中落地，并同
 
 ### 系列一：重新理解 WoT
 
-这一部分先回答“为什么需要 WoT”，而不是立刻进入 Rust 代码。
+这一部分先回答“WoT 处于哪个抽象层，它到底解决什么问题”，而不是从某一种通信协议出发。
 
 会涉及：
 
-- 为什么 Topic 只是通信地址，不是业务语义；
-- W3C WoT 与 MQTT、HTTP、CoAP、Zenoh 的关系；
+- W3C WoT 为什么不是一种新协议；
+- WoT 试图解决的接口异构与互操作问题；
 - Thing Description、Property、Action、Event 和 Form；
+- 同一个 Thing 如何通过不同协议交互；
 - ConsumedThing 与 ProducedThing；
 - 多个 Form 的选择和回退；
 - WoT Runtime 与 Directory、平台服务之间的边界。
@@ -173,14 +174,14 @@ ClinkZ-WoT 的开发大量使用了 AI，但这个系列不会把“使用 AI”
 
 ### 系列一：重新理解 WoT
 
-**1.1**　**重新理解 WoT | 为什么物联网平台不应该从 MQTT Topic 开始设计**（计划中）  
-为什么通信地址不能替代业务语义。
+**1.1**　[**重新理解 WoT | W3C WoT 到底解决什么问题？**](./01-wot-foundations/001-what-does-wot-solve.md)（撰写中）  
+WoT 为什么不是一种新协议，它试图统一的又是什么。
 
-**1.2**　**重新理解 WoT | W3C WoT 不是一种新协议**（计划中）  
-WoT 与具体通信协议是什么关系。
-
-**1.3**　**重新理解 WoT | Thing Description 是语义契约，而不是设备配置文件**（计划中）  
+**1.2**　**重新理解 WoT | Thing Description 是语义契约，而不是设备配置文件**（计划中）  
 TD 应该描述什么、不应该描述什么。
+
+**1.3**　**重新理解 WoT | 同一个 Thing 如何通过不同协议交互**（计划中）  
+Interaction Affordance、Form 与 Protocol Binding 如何分工。
 
 ### 系列二：ClinkZ-WoT 架构设计
 
@@ -220,8 +221,9 @@ late completion 如何污染新一代资源。
 第一次接触 W3C WoT，可以从第一篇开始顺序阅读：
 
 ```text
-重新理解 WoT
+WoT 的问题空间
   -> Thing Description 与交互语义
+  -> Form 与 Protocol Binding
   -> ClinkZ-WoT 架构设计
   -> Rust 运行时机制
   -> 人与 AI 共同开发大型 Rust 项目
@@ -281,4 +283,4 @@ ClinkZ-WoT 仍在开发中。为了避免把设计愿景误写成已经实现的
 
 下一篇将从最基础的问题开始：
 
-> 重新理解 WoT | 为什么物联网平台不应该从 MQTT Topic 开始设计？
+> 重新理解 WoT | W3C WoT 到底解决什么问题？
