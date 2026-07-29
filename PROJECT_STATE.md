@@ -13,6 +13,7 @@ Last updated: 2026-07-29
 - GitHub repository: `https://github.com/yushun1990/clinkz-wot-notes`
 - Default branch: `main`
 - 专栏导读和第一季文章地图已经按新的 WoT 叙事更新。
+- 专栏导读中“ClinkZ-WoT 是什么”“系列一”“1.1 摘要”和推荐阅读路线，已经与 WOT-001 的现实问题主线对齐。
 - WOT-001 修订稿位于：
   `articles/01-wot-foundations/001-what-does-wot-solve.md`
 - WOT-001 当前状态：`DRAFTING`。
@@ -27,7 +28,7 @@ Last updated: 2026-07-29
   **重新理解 WoT | W3C WoT 到底解决什么问题？**
 - 第一篇不得从 MQTT、HTTP、CoAP、Zenoh 或任何单一协议建立 WoT 的问题空间。
 - MQTT、HTTP、CoAP、Modbus、OPC UA、BACnet、Zenoh 与 WoT 不在同一抽象层级；它们只在解释现实接入边界、Form 与 Protocol Binding 时作为具体协议示例出现。
-- 第一篇必须先证明现实中的多协议和多接口碎片化为什么会自然存在，再引入 WoT。
+- 第一篇及专栏导读中的系列一说明，必须先证明现实中的多协议和多接口碎片化为什么会自然存在，再引入 WoT。
 - 不再使用“HTTP 接空调、MQTT 接传感器”这类为协议强行分配设备的开场，也不使用“厂商 A/B/C 分别采用三种协议”的虚构配对作为核心论据。
 - 现实主线采用长期演进的系统：存量设备、现场协议、厂商网关、消息平台、Web API 与新应用在不同阶段进入同一个系统。
 - 文章必须区分“统一传输协议”和“统一 Thing 接口”；全部转成 MQTT 或 HTTP 并不会自动统一能力、数据 Schema、操作语义和错误模型。
@@ -136,7 +137,8 @@ communication is possible
   `f453f165c2ea775e5f0d10c36f1e419fcc1d79f3`；
 - 将项目状态从旧的 v4.9 描述更新为 active v5.0 authority；
 - 明确 Planning、Binding Compiler/Artifact 和完整 Property Read 计划链尚未进入产品实现；
-- 将 W3C 2026 use-case 文档加入外部资料和事实校验记录。
+- 将 W3C 2026 use-case 文档加入外部资料和事实校验记录；
+- 同步更新专栏导读，使系列一的介绍从现实碎片化、统一传输的局限逐步引向共同 Thing 接口。
 
 ## Current Writing Queue
 
