@@ -66,7 +66,7 @@
 ### 第一部分：理解 WoT
 
 1. [W3C WoT 到底解决什么问题？](./articles/01-wot-foundations/001-what-does-wot-solve.md)
-2. Thing Description 是语义契约，而不是设备配置文件
+2. [TD、网关与 Directory 在真实系统中如何协作](./articles/01-wot-foundations/002-td-gateway-directory-in-practice.md)
 3. 同一个 Thing 如何通过不同协议交互
 4. 一个 Thing 有多个 Form 时，运行时如何选择
 
