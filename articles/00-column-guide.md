@@ -7,14 +7,14 @@ series_order: 0
 status: "DRAFTING"
 author: "yushun1990"
 created: "2026-07-28"
-updated: "2026-07-28"
+updated: "2026-07-29"
 summary: "介绍《从零开发一个 Rust WoT 引擎》专栏的写作目标、内容结构、推荐阅读路线和文章更新规则。"
 
 clinkz_wot:
   repository: "https://github.com/yushun1990/clinkz-wot"
   branch: "master"
-  commit: "6c01e07a446f51d413618474554b5eedcf5de23e"
-  inspected_at: "2026-07-28"
+  commit: "f453f165c2ea775e5f0d10c36f1e419fcc1d79f3"
+  inspected_at: "2026-07-29"
 
 publication:
   platform: "zhihu"
@@ -67,7 +67,11 @@ related:
 
 ClinkZ-WoT 希望实现一个以 [W3C Thing Description](https://www.w3.org/TR/wot-thing-description11/) 为语义入口、协议中立的 Rust WoT Runtime。
 
-物联网系统通常同时面对多种设备、厂商接口和通信方式。即使设备都能够连通，应用仍可能需要分别理解 HTTP 的资源与状态码、MQTT 的 Topic 与消息关联、CoAP 的 Observe，以及 Zenoh 的 key expression 与 query。真正缺少的不是又一种通信协议，而是位于这些接口之上的共同 Thing 交互模型。
+真实的物联网系统通常不是一次建成的。存量控制器、现场协议、厂商网关、消息平台、Web API 和后来增加的边缘服务，可能在不同阶段进入同一个系统。多协议、多厂商和多接口长期共存，往往是设备寿命、网络条件、采购边界和系统演进共同造成的结果，而不是为了说明 WoT 人为拼出的场景。
+
+即使系统通过网关把通信统一为 MQTT 或 HTTP，应用仍然需要理解不同的 Topic、Payload、URL、数据含义、操作方式、错误模型和订阅语义。统一传输只能解决“消息怎样到达”的一部分问题，不能自动形成共同的设备能力模型。
+
+真正缺少的不是又一种通信协议，而是位于这些接口之上的、机器可读的 Thing 交互模型。
 
 WoT 尝试把几个层次分开：
 
@@ -81,7 +85,7 @@ Property / Action / Event
 Form + Protocol Binding
         |
         v
-HTTP / MQTT / CoAP / Zenoh / ...
+HTTP / MQTT / CoAP / Modbus / OPC UA / Zenoh / ...
 ```
 
 Thing Description 描述 Thing 能做什么，Protocol Binding 负责如何通过某种协议完成交互，而 Servient Runtime 负责把语义、策略、生命周期和协议执行组织起来。
@@ -101,17 +105,18 @@ ClinkZ-WoT 的目标，就是探索这套模型如何在 Rust 中落地，并同
 
 ### 系列一：重新理解 WoT
 
-这一部分先回答“WoT 处于哪个抽象层，它到底解决什么问题”，而不是从某一种通信协议出发。
+这一部分不会先给空调、传感器或控制器强行分配一种协议，再用虚构示例证明 WoT 的必要性。它会从真实系统为什么自然形成多协议、多厂商和多接口边界开始，逐步追问：通信已经打通以后，应用为什么仍然难以复用设备能力；把所有接口统一成 MQTT 或 HTTP 为什么仍然不够；WoT 又在哪一层介入。
 
 会涉及：
 
-- W3C WoT 为什么不是一种新协议；
-- WoT 试图解决的接口异构与互操作问题；
-- Thing Description、Property、Action、Event 和 Form；
-- 同一个 Thing 如何通过不同协议交互；
-- ConsumedThing 与 ProducedThing；
-- 多个 Form 的选择和回退；
-- WoT Runtime 与 Directory、平台服务之间的边界。
+- 存量设备、网络约束、采购边界和长期演进如何形成协议与接口碎片化；
+- 统一传输协议为什么不等于统一设备能力、数据含义和交互语义；
+- W3C WoT 为什么不是一种新协议，它试图建立什么共同接口；
+- Thing Description 为什么是语义契约，而不是设备或运行时配置文件；
+- Property、Action、Event、Data Schema 和 Form 如何描述 Thing 的能力与访问方式；
+- 同一个 Thing 如何通过不同协议或多个 Form 交互；
+- ConsumedThing、ProducedThing、Protocol Binding 与 Servient 分别承担什么责任；
+- 多个 Form 的选择、回退，以及 WoT Runtime 与 Directory、平台服务之间的边界。
 
 ### 系列二：ClinkZ-WoT 架构设计
 
@@ -175,7 +180,7 @@ ClinkZ-WoT 的开发大量使用了 AI，但这个系列不会把“使用 AI”
 ### 系列一：重新理解 WoT
 
 **1.1**　[**重新理解 WoT | W3C WoT 到底解决什么问题？**](./01-wot-foundations/001-what-does-wot-solve.md)（撰写中）  
-WoT 为什么不是一种新协议，它试图统一的又是什么。
+真实系统为什么会自然形成多协议、多接口边界，统一 MQTT 或 HTTP 为什么仍然不够，以及 WoT 在哪一层介入。
 
 **1.2**　**重新理解 WoT | Thing Description 是语义契约，而不是设备配置文件**（计划中）  
 TD 应该描述什么、不应该描述什么。
@@ -221,7 +226,8 @@ late completion 如何污染新一代资源。
 第一次接触 W3C WoT，可以从第一篇开始顺序阅读：
 
 ```text
-WoT 的问题空间
+真实系统的协议与接口碎片化
+  -> WoT 的问题空间
   -> Thing Description 与交互语义
   -> Form 与 Protocol Binding
   -> ClinkZ-WoT 架构设计
