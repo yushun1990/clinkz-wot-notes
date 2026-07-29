@@ -26,6 +26,7 @@ related:
   next: "WOT-001"
   articles:
     - "WOT-001"
+    - "WOT-002"
     - "ARCH-001"
     - "RUST-001"
     - "AI-001"
@@ -105,14 +106,17 @@ ClinkZ-WoT 的目标，就是探索这套模型如何在 Rust 中落地，并同
 
 ### 系列一：重新理解 WoT
 
-这一部分不会先给空调、传感器或控制器强行分配一种协议，再用虚构示例证明 WoT 的必要性。它会从真实系统为什么自然形成多协议、多厂商和多接口边界开始，逐步追问：通信已经打通以后，应用为什么仍然难以复用设备能力；把所有接口统一成 MQTT 或 HTTP 为什么仍然不够；WoT 又在哪一层介入。
+这一部分不会先给空调、传感器或控制器强行分配一种协议，再用虚构示例证明 WoT 的必要性。它会从真实系统为什么自然形成多协议、多厂商和多接口边界开始，继续追问 TD 在工程里究竟怎样产生、由谁托管、应用怎样发现，以及网关和 Directory 分别承担什么责任。
 
 会涉及：
 
 - 存量设备、网络约束、采购边界和长期演进如何形成协议与接口碎片化；
 - 统一传输协议为什么不等于统一设备能力、数据含义和交互语义；
 - W3C WoT 为什么不是一种新协议，它试图建立什么共同接口；
-- Thing Description 为什么是语义契约，而不是设备或运行时配置文件；
+- 工艺人员、设备集成人员和平台开发者如何共同形成 Thing Model 与具体 TD；
+- 存量设备为什么不需要原生支持 WoT，网关如何代理、聚合并暴露虚拟 Thing；
+- TD 可以托管在设备、网关或平台，TD Server 与 Thing Description Directory 有什么区别；
+- Directory 为什么只负责 TD 的登记和发现，而不是设备消息总线；
 - Property、Action、Event、Data Schema 和 Form 如何描述 Thing 的能力与访问方式；
 - 同一个 Thing 如何通过不同协议或多个 Form 交互；
 - ConsumedThing、ProducedThing、Protocol Binding 与 Servient 分别承担什么责任；
@@ -182,8 +186,8 @@ ClinkZ-WoT 的开发大量使用了 AI，但这个系列不会把“使用 AI”
 **1.1**　[**重新理解 WoT | W3C WoT 到底解决什么问题？**](./01-wot-foundations/001-what-does-wot-solve.md)（撰写中）  
 真实系统为什么会自然形成多协议、多接口边界，统一 MQTT 或 HTTP 为什么仍然不够，以及 WoT 在哪一层介入。
 
-**1.2**　**重新理解 WoT | Thing Description 是语义契约，而不是设备配置文件**（计划中）  
-TD 应该描述什么、不应该描述什么。
+**1.2**　[**重新理解 WoT | TD、网关与 Directory 在真实系统中如何协作**](./01-wot-foundations/002-td-gateway-directory-in-practice.md)（撰写中）  
+业务能力怎样变成具体 TD，存量设备如何由网关代理，应用又怎样通过 Directory 找到并消费 Thing。
 
 **1.3**　**重新理解 WoT | 同一个 Thing 如何通过不同协议交互**（计划中）  
 Interaction Affordance、Form 与 Protocol Binding 如何分工。
@@ -228,7 +232,7 @@ late completion 如何污染新一代资源。
 ```text
 真实系统的协议与接口碎片化
   -> WoT 的问题空间
-  -> Thing Description 与交互语义
+  -> TD、网关与 Directory 的实际协作
   -> Form 与 Protocol Binding
   -> ClinkZ-WoT 架构设计
   -> Rust 运行时机制
