@@ -1,10 +1,10 @@
 # Writing Project State
 
-Last updated: 2026-07-28
+Last updated: 2026-07-29
 
 ## Current Objective
 
-完成第一篇文章的作者理解校验和第二轮技术校验，将新稿推进到可发布状态：
+完成第一篇文章的作者理解校验和第二轮技术校验，将修订稿推进到可发布状态：
 
 > WOT-001｜重新理解 WoT | W3C WoT 到底解决什么问题？
 
@@ -13,10 +13,9 @@ Last updated: 2026-07-28
 - GitHub repository: `https://github.com/yushun1990/clinkz-wot-notes`
 - Default branch: `main`
 - 专栏导读和第一季文章地图已经按新的 WoT 叙事更新。
-- WOT-001 新稿已经写入：
+- WOT-001 修订稿位于：
   `articles/01-wot-foundations/001-what-does-wot-solve.md`
 - WOT-001 当前状态：`DRAFTING`。
-- 原“为什么物联网平台不应该从 MQTT Topic 开始设计”不再作为第一篇正式选题；其内容保留在 Git 历史中，可在后续讨论 Protocol Binding 或平台自定义应用协议时复用。
 - 尚未登记知乎 canonical URL。
 
 ## Stable Decisions
@@ -27,7 +26,12 @@ Last updated: 2026-07-28
 - 第一篇正式标题为：
   **重新理解 WoT | W3C WoT 到底解决什么问题？**
 - 第一篇不得从 MQTT、HTTP、CoAP、Zenoh 或任何单一协议建立 WoT 的问题空间。
-- MQTT、HTTP、CoAP、Zenoh 与 WoT 不在同一抽象层级；它们只在解释 Form 与 Protocol Binding 时作为具体协议示例出现。
+- MQTT、HTTP、CoAP、Modbus、OPC UA、BACnet、Zenoh 与 WoT 不在同一抽象层级；它们只在解释现实接入边界、Form 与 Protocol Binding 时作为具体协议示例出现。
+- 第一篇必须先证明现实中的多协议和多接口碎片化为什么会自然存在，再引入 WoT。
+- 不再使用“HTTP 接空调、MQTT 接传感器”这类为协议强行分配设备的开场，也不使用“厂商 A/B/C 分别采用三种协议”的虚构配对作为核心论据。
+- 现实主线采用长期演进的系统：存量设备、现场协议、厂商网关、消息平台、Web API 与新应用在不同阶段进入同一个系统。
+- 文章必须区分“统一传输协议”和“统一 Thing 接口”；全部转成 MQTT 或 HTTP 并不会自动统一能力、数据 Schema、操作语义和错误模型。
+- 泵站场景只作为基于公开标准与 W3C use cases 的组合说明，不声称对应某个具体生产项目。
 - 系列一前三篇顺序固定为：
   1. W3C WoT 到底解决什么问题；
   2. Thing Description 是语义契约，而不是设备配置文件；
@@ -36,26 +40,30 @@ Last updated: 2026-07-28
 - 文章必须绑定一个明确的主项目 commit，并区分实现、已接受设计、计划和探索内容。
 - 写作同时服务于项目传播和作者真正掌握 ClinkZ-WoT，不用流畅文案掩盖理解缺口。
 
-## Why the Previous Framing Was Rejected
+## Why the Framing Changed
 
-原稿从“很多物联网平台从 MQTT Topic 开始设计”切入，虽然其中关于 Topic、业务语义和协议边界的部分可以成立，但它存在两个根本问题：
-
-1. 它把部分 MQTT 项目的工程路径扩大成了整个物联网平台领域的普遍问题；
-2. 它让读者误以为 WoT 是为了修正或替代 MQTT，而不是处理位于具体协议之上的 Thing 描述与交互问题。
-
-因此，第一篇改为直接回答 WoT 自己的问题空间：
+最初的 WOT-001 草稿虽然没有再把 WoT 写成 MQTT 的替代品，但仍从以下虚构配对开始：
 
 ```text
-不同设备和服务已经能够通信
-        |
-        v
-接口、能力和交互方式仍然彼此异构
-        |
-        v
-应用缺少共同、机器可读的 Thing 接口模型
-        |
-        v
-TD + Interaction Affordance + Form + Protocol Binding
+HTTP 空调
+MQTT 传感器
+CoAP 或 Zenoh 边缘控制器
+```
+
+后文又使用“厂商 A 走 HTTP、厂商 B 走 MQTT、厂商 C 走 Zenoh”的水泵示例。
+
+这种写法先假设协议碎片化成立，再用人为分配的设备和协议解释 WoT，缺少现实因果，也容易让读者追问“为什么空调一定使用 HTTP，传感器一定使用 MQTT”。
+
+修订后的因果链为：
+
+```text
+真实系统不是一次建成
+  -> 设备寿命、网络约束、采购和厂商生态不同
+  -> 存量协议、网关、消息平台和 Web API 长期共存
+  -> 应用不仅面对协议差异，还面对能力、Schema 和行为差异
+  -> 统一 MQTT/HTTP 只能统一部分传输
+  -> 需要共同、机器可读的 Thing 接口
+  -> TD + Interaction Affordance + Form + Protocol Binding
 ```
 
 ## WOT-001 Research Baseline
@@ -64,99 +72,94 @@ TD + Interaction Affordance + Form + Protocol Binding
 
 - Repository: `https://github.com/yushun1990/clinkz-wot`
 - Branch: `master`
-- Commit: `6c01e07a446f51d413618474554b5eedcf5de23e`
-- Inspected at: `2026-07-28`
+- Commit: `f453f165c2ea775e5f0d10c36f1e419fcc1d79f3`
+- Inspected at: `2026-07-29`
+- Active design revision: `v5.0 bounded-core authority`
 
-Read during the draft:
+Read or rechecked during this revision:
 
 - `AGENTS.md`
 - `PROJECT_STATE.md`
-- `PLAN.md`
-- `README.md`
 - `docs/architecture/10-primary-data-flows.md`
+- the current WOT-001 draft
 
-External standards checked:
+Current implementation boundary recorded in the article:
+
+- WP-100 includes completed Foundation and Core slices.
+- M1 and M2 remain in progress.
+- M3 Planning and Compilation Pipeline remains open.
+- The planned `clinkz-wot-planning` crate and the v5 Logical Plan, Binding Artifact and Binding Compiler product types are not implemented.
+- Existing Protocol Binding paths still reflect the legacy direct execution boundary.
+
+### External standards checked
 
 - W3C Web of Things Architecture 1.1
 - W3C Web of Things Thing Description 1.1
 - W3C Web of Things Binding Templates
 - W3C Web of Things Discovery
+- W3C Web of Things: Use Cases and Requirements, 2026-02-05
 
-### Core argument
+The key external evidence is:
 
-W3C WoT 不发明新的通信协议，也不与 MQTT、HTTP、CoAP 或 Zenoh 竞争。它解决的是更上一层的问题：如何以机器可读的方式描述物理或虚拟 Thing 的元数据和网络接口，让 Consumer 围绕 Property、Action 和 Event 表达交互意图，再通过 Form 与 Protocol Binding 将这些交互落实到具体协议消息。
+- W3C WoT Architecture states that IoT uses multiple protocols because no single protocol is appropriate in all contexts.
+- The 2026 use-case document explicitly includes cross-protocol Industry 4.0 interaction, brownfield and constrained devices, multi-vendor integration, and protocol abstraction from business applications.
 
-第一篇的主线是：
+## Core Argument
+
+W3C WoT 不发明新的通信协议，也不与 MQTT、HTTP、CoAP、Modbus、OPC UA、BACnet 或 Zenoh 竞争。
+
+它处理的是更上一层的问题：
 
 ```text
 communication is possible
-  -> interfaces are still heterogeneous
-  -> applications need a shared interaction model
-  -> TD describes the Thing interface
-  -> Protocol Binding maps affordances to protocol messages
-  -> WoT Runtime turns description into execution
+  -> real systems retain heterogeneous interfaces
+  -> unified transport does not create unified semantics
+  -> applications need a shared, machine-readable Thing interface
+  -> TD describes capabilities and network-facing forms
+  -> Protocol Binding maps interactions to real protocol behavior
+  -> WoT Runtime turns description into governed execution
 ```
-
-### ClinkZ-WoT relevance
-
-当前已接受的项目方向是：
-
-```text
-TD
-  -> parse and validate
-  -> immutable planning context
-  -> logical plans
-  -> binding-owned artifacts
-  -> admitted immutable plan set
-  -> runtime execution
-```
-
-协议中立层描述 Thing、Property、Action、Event 和 operation；Protocol Binding 拥有 HTTP URL、MQTT Topic、CoAP resource、Zenoh key expression 等协议专属知识；Servient 拥有运行时编排、生命周期和清理权威。
-
-### Fact-state boundary
-
-- WoT Thing、TD、Interaction Affordance 和 Protocol Binding 分工：外部标准事实。
-- ClinkZ-WoT semantic-first、immutable planning context、logical plan、binding-owned artifact 和 immutable plan set：`ACCEPTED_DESIGN`。
-- 主项目仍处于 v4.9 架构闭合，M1/M2 进行中：当前项目状态。
-- 完整 Property Read 纵向链路、Planning、Binding SPI 和 Servient 集成尚未全部完成：`PLANNED` / partially implemented / blocked work。
-- 文章中的接口、TD 和 Rust 模块流程均明确标为概念示意，不冒充当前稳定 API。
 
 ## Draft Status
 
-新稿已经包含：
+2026-07-29 修订已经完成以下调整：
 
-- 从不同设备和接口的异构问题开场；
-- WoT 与通信协议所处层级的对照；
-- “接口异构”为什么不只是“协议太多”；
-- Thing 可以是物理实体或虚拟实体；
-- Property、Action、Event 三类 Interaction Affordance；
-- TD、Form 与 Protocol Binding 的责任；
-- WoT 不是什么及其能力边界；
-- 为什么只有 TD 仍然需要 WoT Runtime；
-- ClinkZ-WoT 的 TD-to-plan-to-binding 方向；
-- 当前项目状态和未完成边界；
-- 采用 WoT 所需付出的建模、Binding 和生命周期治理成本。
+- 删除“HTTP 空调、MQTT 传感器、CoAP/Zenoh 控制器”的开场；
+- 删除厂商 A/B/C 按协议分配水泵接口的核心示例；
+- 从系统长期演进、设备寿命、通信约束和厂商生态解释协议碎片化；
+- 明确多协议共存不必然是架构失败；
+- 增加“统一为 MQTT 或 HTTP 为什么仍然不够”的直觉方案与失败边界；
+- 使用同一条泵站能力主线解释 Property、Action、Event、Form 与 Protocol Binding；
+- 补充存量设备可以由网关或代理提供 TD，不要求设备原生支持 TD；
+- 明确 Thing 可以是聚合多个设备和服务的虚拟对象；
+- 更新 ClinkZ-WoT 基线到 commit
+  `f453f165c2ea775e5f0d10c36f1e419fcc1d79f3`；
+- 将项目状态从旧的 v4.9 描述更新为 active v5.0 authority；
+- 明确 Planning、Binding Compiler/Artifact 和完整 Property Read 计划链尚未进入产品实现；
+- 将 W3C 2026 use-case 文档加入外部资料和事实校验记录。
 
 ## Current Writing Queue
 
-1. WOT-001 — 作者理解校验：文章是否准确表达“WoT 解决接口与交互模型问题，而不是协议替代问题”；
+1. WOT-001 — 作者确认新的现实问题主线是否符合预期；
 2. WOT-001 — 第二轮标准术语和技术事实校验；
-3. WOT-001 — 根据作者反馈调整案例、语气和篇幅；
-4. WOT-001 — 发布前回填知乎信息和前后导航；
-5. WOT-002 — 在 WOT-001 方向稳定后开始提纲。
+3. WOT-001 — 检查知乎版本篇幅，压缩重复解释；
+4. WOT-001 — 决定是否绘制“真实系统碎片化 → TD/Binding”数据流图；
+5. WOT-001 — 校验完成后将状态从 `DRAFTING` 改为 `REVIEWING`；
+6. WOT-002 — 在 WOT-001 方向稳定后开始提纲。
 
 ## Next Safe Actions
 
-1. 检查第一篇是否过早进入 ClinkZ-WoT 内部架构，必要时压缩 Rust 边界章节。
-2. 检查 Property、Action、Event、Form 和 Protocol Binding 的措辞是否严格对应 W3C WoT 1.1。
-3. 决定知乎版本保留约 4000–5000 字完整稿，还是压缩为更偏传播的版本。
-4. 完成第二轮技术校验后，将状态从 `DRAFTING` 改为 `REVIEWING`。
-5. 发布后回填 `published_at`、`canonical_url`、文章地图和下一篇链接。
+1. 检查 Property、Action、Event、Form、Protocol Binding 和 brownfield 的措辞是否严格对应 W3C WoT 1.1。
+2. 检查泵站组合场景是否足够具体，但不会被误读为某个真实项目的案例报告。
+3. 压缩 ClinkZ-WoT 内部架构部分，避免第一篇过早进入 v5 细节。
+4. 评估知乎版本保留约 4000–5000 字完整稿，还是进一步压缩。
+5. 完成技术校验后，更新状态和发布检查项。
 
 ## Open Editorial Questions
 
+- 第一篇是否需要单独绘制：
+  `存量设备/厂商平台 -> 网关与接口 -> TD -> WoT Consumer`。
 - 知乎版本是否保留 Front Matter 之外的项目 commit 基线提示。
-- 第一篇是否需要单独绘制“领域能力—交互模型—Form—协议—运行时”分层图。
 - 外部平台标题是否始终使用系列前缀，仓库文件内标题保持一致。
 - 正文和图表最终采用哪一种内容许可证。
 
@@ -169,5 +172,5 @@ TD
 3. `CONTENT_PLAN.md`；
 4. `EDITORIAL_GUIDE.md`；
 5. `SOURCE_POLICY.md`；
-6. WOT-001 新稿；
+6. WOT-001 修订稿；
 7. ClinkZ-WoT 主仓库最新状态。
