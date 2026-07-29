@@ -1,20 +1,20 @@
 ---
 id: "WOT-001"
 title: "重新理解 WoT | W3C WoT 到底解决什么问题？"
-subtitle: "它不发明新的通信协议，而是让应用以一致方式理解和操作不同的 Thing"
+subtitle: "协议碎片化通常源于真实系统的长期演进，WoT 在其上建立统一的 Thing 接口"
 series: "重新理解 WoT"
 series_order: 1
 status: "DRAFTING"
 author: "yushun1990"
 created: "2026-07-28"
-updated: "2026-07-28"
-summary: "W3C Web of Things 不试图替代 MQTT、HTTP、CoAP 或 Zenoh。它解决的是更上一层的问题：如何用机器可读的方式描述不同物理设备和软件服务提供的能力，让应用围绕 Property、Action 和 Event 交互，再由 Protocol Binding 将这些交互映射到具体协议。"
+updated: "2026-07-29"
+summary: "真实的物联网系统往往同时包含存量设备、现场协议、消息系统、厂商平台和 Web API。W3C Web of Things 不要求它们改用同一种通信协议，而是用 Thing Description 描述共同的能力和交互方式，再由 Form 与 Protocol Binding 将 Property、Action 和 Event 映射到具体接口。"
 
 clinkz_wot:
   repository: "https://github.com/yushun1990/clinkz-wot"
   branch: "master"
-  commit: "6c01e07a446f51d413618474554b5eedcf5de23e"
-  inspected_at: "2026-07-28"
+  commit: "f453f165c2ea775e5f0d10c36f1e419fcc1d79f3"
+  inspected_at: "2026-07-29"
 
 publication:
   platform: "zhihu"
@@ -35,65 +35,180 @@ related:
 
 # 重新理解 WoT | W3C WoT 到底解决什么问题？
 
-> 本文基于 ClinkZ-WoT commit `6c01e07a446f51d413618474554b5eedcf5de23e`。
+> 本文基于 ClinkZ-WoT commit `f453f165c2ea775e5f0d10c36f1e419fcc1d79f3`。
 >
 > ClinkZ-WoT 仍处于架构闭合和分阶段实现过程中。本文首先解释 W3C Web of Things 的问题空间，再说明 ClinkZ-WoT 为什么选择从 Thing Description 开始构建运行时；文中的完整执行链并不代表当前已经全部实现。
 
-假设一个应用需要操作三台设备：
+真实的物联网系统通常不是在同一天、由同一支团队、围绕同一种协议设计出来的。
 
-- 一台通过 HTTP 暴露接口的空调；
-- 一台通过 MQTT 收发消息的传感器；
-- 一台通过 CoAP 或 Zenoh 接入的边缘控制器。
+一套已经运行多年的工厂、园区或供水系统，可能经历过多轮建设：
 
-它们可能都提供非常相似的能力：读取当前状态、修改一个设定值、启动某项操作、订阅异常通知。
+- 早期控制器和仪表仍在稳定运行，通过现场协议或工业网关接入；
+- 后来增加的无线传感器，由厂商网关汇聚并向平台发布消息；
+- 某些成套设备只能通过厂商提供的管理平台或 HTTPS API 操作；
+- 新建设备可能使用另一套消息总线，边缘服务和云端服务又有自己的接口；
+- 业务系统最终需要把这些来源组合成监控、告警、联动和运维流程。
 
-真正困难的地方并不是这些协议无法通信。HTTP、MQTT、CoAP 和 Zenoh 都能很好地完成各自擅长的通信任务。困难在于，应用通常必须分别理解每一种接口：
+没有人会为了“架构统一”轻易替换仍可使用的控制器，也没有一种通信方式适合低功耗传感器、实时控制、局域网设备和跨公网服务等所有环境。
+
+因此，多协议共存并不一定是设计失败。它往往是设备寿命、网络条件、成本、供应商边界和系统长期演进共同产生的结果。
+
+W3C WoT Architecture 1.1 对这个前提说得很直接：IoT 使用多种设备访问协议，因为没有一种协议适合所有上下文。W3C 在 2026 年发布的 WoT Use Cases and Requirements 中，也专门收录了工业跨协议交互、存量设备、跨厂商集成和协议抽象等场景。
+
+所以，介绍 WoT 不需要先虚构“一台空调用 HTTP、一台传感器用 MQTT”。现实问题本来就存在。真正需要追问的是：
+
+> 当系统中的设备和服务已经能够通信，为什么上层应用仍然越来越难维护？
+
+## 多协议共存为什么会成为长期状态
+
+协议碎片化通常来自四类现实约束。
+
+### 设备的生命周期远长于软件系统
+
+工业控制器、楼宇设备、仪表和网关可能连续运行十几年。新的平台上线时，现场设备不可能全部替换。
+
+这类设备可能通过 Modbus、BACnet、OPC UA 或厂商私有协议工作。为了让现代应用访问它们，系统通常在网关、边缘服务或代理层完成协议转换。
+
+### 不同场景需要不同通信特性
+
+设备侧可能重视低功耗、弱网络和小报文；控制网络重视确定性和本地自治；云端系统重视可扩展接入；第三方服务则更适合通过 Web API 集成。
+
+选择 MQTT、HTTP、CoAP、OPC UA、BACnet、Modbus 或其他协议，往往是在解决不同约束，而不是团队对“最佳协议”没有共识。
+
+### 采购和厂商生态会形成边界
+
+成套设备经常带有自己的控制器、网关、数据格式和管理平台。系统集成方能够获得的接口，可能是一个寄存器表、一组 OPC UA Node、若干 MQTT Topic，也可能只是一份 REST API 文档。
+
+业务系统必须面对厂商实际提供的接口，而不是理想中的统一协议。
+
+### 系统会不断增加新的应用
+
+最初系统可能只需要采集数据，后来又增加告警、远程控制、数字孪生、移动端、AI 分析和跨系统联动。
+
+同一批设备会被越来越多的应用使用。如果每个应用都重新理解底层接口，接入复杂度就会随着应用数量再次增长。
+
+## 真正让应用痛苦的，不只是协议名称
+
+假设业务系统需要操作一个泵站。它关心的是：
 
 ```text
-HTTP
-  -> URL、method、status code、header、response body
-
-MQTT
-  -> topic、payload、QoS、订阅、请求与响应关联
-
-CoAP
-  -> resource、method、option、observe
-
-Zenoh
-  -> key expression、query、put、subscriber
+读取出口压力
+读取运行状态
+启动水泵
+订阅过载告警
 ```
 
-如果每接入一种设备或协议，应用就要增加一套专用代码，那么系统虽然“连通”了很多设备，却没有形成统一的交互模型。
+但这些能力可能散落在不同接口中：
 
-**W3C Web of Things（WoT）试图解决的，正是这个位于协议之上的问题。**
+```text
+出口压力
+  -> 由边缘网关读取现场寄存器后提供
+
+运行状态
+  -> 出现在某个 MQTT Topic 的厂商 Payload 中
+
+启动水泵
+  -> 只能调用设备管理服务的 HTTPS API
+
+过载告警
+  -> 由另一个告警服务推送
+```
+
+这里并不是说某种设备“天生应该”使用某种协议。重点在于，业务应用看到的不是四项稳定能力，而是四套不同的访问约定：
+
+- 地址或资源如何定位；
+- 请求如何构造；
+- 数据如何编码；
+- 身份认证如何完成；
+- 错误如何表达；
+- 订阅如何建立和取消；
+- 厂商字段究竟代表什么。
+
+如果直接集成，协议和厂商细节会逐渐进入业务代码：
+
+```text
+监控页面知道 Topic 和 JSON 字段
+规则引擎知道寄存器地址
+运维服务知道厂商 URL 和鉴权方式
+告警流程知道某种回调 Payload
+```
+
+系统当然仍然能够工作，但“设备能力”没有形成独立、可复用的接口模型。更换设备、增加供应商或接入新应用时，多个模块都可能需要修改。
+
+这才是 WoT 试图处理的问题：**通信已经打通，但应用仍缺少共同、机器可读的 Thing 接口。**
+
+## 直觉方案：把所有接口都转成 MQTT 或 HTTP
+
+一个自然的解决办法，是在网关或平台入口统一协议。
+
+例如：
+
+```text
+Modbus / BACnet / OPC UA / vendor protocol
+                    |
+                    v
+                  Gateway
+                    |
+                    v
+              MQTT or HTTP API
+```
+
+这一步很有价值。它可以减少连接方式，统一认证入口，也便于集中运维。
+
+但统一传输不等于统一接口。
+
+即使所有数据都进入 MQTT，不同设备仍可能拥有完全不同的：
+
+- Topic 结构；
+- Payload Schema；
+- 设备身份表达；
+- 命令与响应关联方式；
+- 错误编码；
+- 在线状态和重试语义。
+
+即使全部改成 HTTP，不同厂商仍会提供不同的 URL、method、字段、状态码和异步任务模型。
+
+因此，统一协议最多解决了“消息怎样到达”的一部分问题。它并没有自动回答：
+
+- 这个对象是什么；
+- 它有哪些状态；
+- 哪些状态可读、可写或可观察；
+- 可以触发哪些操作；
+- 会产生哪些事件；
+- 输入和输出满足什么约束；
+- 同一能力可以通过哪些接口访问。
+
+对于范围固定、设备单一、只服务一个应用的系统，平台内部自定义一套统一 API 往往已经足够。WoT 并不是每个项目都必须增加的一层。
+
+当系统需要跨设备、跨协议、跨厂商并长期演进时，才更需要把“Thing 的能力”从具体传输接口中分离出来。
 
 ## WoT 不是另一种通信协议
 
-理解 WoT，首先要把几个层次分开。
+W3C Web of Things（WoT）不要求现场设备改用一种名为“WoT”的新协议。
+
+它位于现有协议之上，试图建立一套共同的描述和交互模型。
 
 | 层次 | 主要问题 | 典型内容 |
 |---|---|---|
-| 领域与能力 | 这个对象是什么，能做什么 | 温度、开关、启动、告警 |
+| 领域与能力 | 这个对象是什么，能做什么 | 压力、开关、启动、告警 |
 | 交互模型 | 应用可以怎样操作它 | Property、Action、Event |
 | 接口描述 | 数据、安全和访问入口是什么 | Data Schema、Security、Form |
-| 协议通信 | 请求和消息怎样传输 | HTTP、MQTT、CoAP、Zenoh |
+| 协议通信 | 请求和消息怎样传输 | HTTP、MQTT、CoAP、Modbus、OPC UA、Zenoh |
 | 运行时执行 | 如何选择、校验、调用和清理 | planning、Binding、lifecycle |
 
-MQTT、HTTP、CoAP 和 Zenoh 主要位于协议通信层。它们规定消息、请求或数据如何抵达另一端。
+下层协议负责把数据或请求送到另一端。
 
-WoT 位于更上一层。它不要求所有设备改用某一种统一协议，而是尝试建立一种共同语言，用来描述：
+WoT 负责描述：
 
 - 这是一个什么 Thing；
-- 它暴露了哪些状态；
-- 可以对它触发哪些操作；
-- 它会产生哪些通知；
+- 它暴露哪些状态；
+- 可以触发哪些操作；
+- 会产生哪些通知；
 - 输入和输出数据满足什么约束；
 - 需要什么安全配置；
 - 可以通过哪些网络接口完成交互。
 
-因此，WoT 与 MQTT 不是竞争者，WoT 与 HTTP 也不是竞争者。
-
-更准确的关系是：
+两者的关系更接近：
 
 ```text
 Thing 的能力与交互语义
@@ -105,126 +220,18 @@ Thing Description
 Form + Protocol Binding
           |
           v
-HTTP / MQTT / CoAP / Zenoh / ...
+HTTP / MQTT / CoAP / Modbus / OPC UA / Zenoh / ...
 ```
 
-下层协议仍然负责通信，只是不再要求上层应用把某个协议的地址、消息格式和调用习惯当成 Thing 本身。
+因此，WoT 与 MQTT 不是竞争者，WoT 与 HTTP 也不是竞争者。
 
-## WoT 面对的是“接口异构”，不只是“协议异构”
+WoT 希望避免的是：上层应用把某个 Topic、寄存器、URL 或厂商 Payload 当成 Thing 本身。
 
-把问题简单说成“协议太多”仍然不够准确。
+## Thing Description：把能力和访问方式写进同一份契约
 
-即使两个设备都使用 MQTT，它们也可能拥有完全不同的 Topic 约定、Payload 格式、命令响应和错误表达。反过来，同一个 Thing 的同一项能力，也可能同时通过 HTTP 和 MQTT 暴露。
+Thing Description（TD）是 WoT 的中心构件。它使用机器可读的格式描述 Thing 的元数据和面向网络的接口。
 
-例如，一台水泵提供“出口压力”与“启动”两项能力：
-
-```text
-出口压力：可以读取，也可以观察变化
-启动：接收启动模式，触发一个可能产生副作用的过程
-```
-
-不同厂商可能把它们实现成：
-
-```text
-厂商 A：
-GET /api/pumps/17/pressure
-POST /api/pumps/17/start
-
-厂商 B：
-订阅 factory/pump/17/telemetry
-发布 factory/pump/17/command/start
-
-厂商 C：
-对 factory/pumps/17/pressure 发起 query
-向 factory/pumps/17/start 执行 put
-```
-
-从通信角度看，这是三套不同接口。
-
-从应用角度看，它们表达的却可能是同一组能力：
-
-```text
-Property: pressure
-Action: start
-```
-
-如果没有位于协议之上的共同描述，应用只能为厂商 A、B、C 分别编写适配代码。随着设备、协议和平台增加，这些适配会分散到业务服务、规则引擎、前端组件和自动化流程中。
-
-WoT 并不能让差异自动消失，但它要求这些差异被放到清楚的边界里：
-
-- 共同的能力由 Interaction Affordance 描述；
-- 数据约束由 Data Schema 描述；
-- 具体访问入口由 Form 描述；
-- 协议消息如何构造和解释，由 Protocol Binding 负责。
-
-## Thing：物理设备，也可以是虚拟对象
-
-WoT 中的 Thing 不是“某种联网硬件”的同义词。
-
-W3C WoT Architecture 把 Thing 看作物理实体或虚拟实体的抽象。它可以是：
-
-- 真实传感器；
-- 工业控制器；
-- 网关代理的传统设备；
-- 数字孪生；
-- 聚合多个设备能力的虚拟 Thing；
-- 通过网络接口提供交互的软件服务。
-
-这很重要，因为应用真正希望复用的通常不是“如何连接某块硬件”，而是“如何操作一个具有明确能力的对象”。
-
-例如，一个模拟水泵和一台真实水泵可以拥有相同的 `pressure` Property 与 `start` Action。二者的底层实现完全不同，但上层测试工具、监控界面和编排逻辑可以围绕同一组交互语义工作。
-
-## WoT 的三个基本交互类型
-
-W3C WoT 用三类 Interaction Affordance 描述 Consumer 可以如何与 Thing 交互。
-
-### Property：Thing 的状态
-
-Property 表达可以读取、写入或观察的状态。
-
-例如：
-
-- 当前温度；
-- 电机转速；
-- 门锁状态；
-- 目标压力；
-- 设备运行模式。
-
-Property 不等于某条遥测消息。它强调的是状态及其读、写、观察能力。具体实现可以是一次 HTTP GET、一次 CoAP Read，也可以由某个 MQTT 或 Zenoh Binding 通过消息交互完成。
-
-### Action：触发一个操作
-
-Action 表达调用者可以触发的功能或过程。
-
-例如：
-
-- 启动水泵；
-- 重启控制器；
-- 执行校准；
-- 开始固件升级；
-- 生成一次诊断报告。
-
-Action 可以定义输入与输出，也可以声明安全性、幂等性或同步性等信息。它表达的是“调用某项能力”，而不是绑定到某个固定的 HTTP method 或消息 Topic。
-
-### Event：Thing 主动产生的通知
-
-Event 表达 Thing 产生的异步通知源。
-
-例如：
-
-- 过热告警；
-- 门被打开；
-- 电机堵转；
-- 作业完成；
-- 连接状态异常。
-
-Event 的具体传输可能使用 MQTT 订阅、Server-Sent Events、WebSocket、CoAP Observe 或 Zenoh Subscriber。WoT 关心的是这些通知在 Thing 的接口中代表什么。
-
-## Thing Description 是 WoT 的中心入口
-
-Thing Description（TD）是 W3C WoT 的核心构件。它使用机器可读的数据描述 Thing 的元数据和面向网络的接口。
-
-一个 TD 通常会包含：
+一个 TD 通常包含：
 
 ```text
 Thing metadata
@@ -238,19 +245,30 @@ Thing metadata
   +-- Links and semantic annotations
 ```
 
-下面是一段只用于说明层次的概念示意，并非完整的生产 TD：
+仍以泵站为例，应用真正需要的接口可以被表达为：
+
+```text
+Property: outletPressure
+Property: running
+Action: start
+Event: overloadAlarm
+```
+
+TD 进一步说明这些交互的数据类型、安全要求和访问入口。
+
+一段只用于说明层次的概念示意如下，它不是完整的生产 TD：
 
 ```json
 {
-  "title": "Pump 17",
+  "title": "Pumping Station 17",
   "properties": {
-    "pressure": {
+    "outletPressure": {
       "type": "number",
       "unit": "kPa",
       "readOnly": true,
       "forms": [
         {
-          "href": "https://example.com/pumps/17/pressure",
+          "href": "https://edge.example.com/stations/17/pressure",
           "op": ["readproperty"]
         }
       ]
@@ -263,7 +281,7 @@ Thing metadata
       },
       "forms": [
         {
-          "href": "https://example.com/pumps/17/start",
+          "href": "https://vendor.example.com/stations/17/start",
           "op": ["invokeaction"]
         }
       ]
@@ -275,38 +293,104 @@ Thing metadata
 这里最重要的不是 JSON 语法，而是依赖方向：
 
 ```text
-应用要读取 pressure
-        |
-        v
-找到 pressure Property
-        |
-        v
+应用要读取 outletPressure
+          |
+          v
+找到 outletPressure Property
+          |
+          v
 选择支持 readproperty 的 Form
-        |
-        v
+          |
+          v
 由对应 Protocol Binding 执行
 ```
 
-应用表达的是交互意图，Form 和 Binding 负责把意图落实为具体网络通信。
+应用表达的是“读取出口压力”，而不是“调用这个 URL”或“读取某个寄存器”。
 
-## Protocol Binding 负责把语义变成协议消息
+具体地址和协议仍然存在，只是被放到了明确的接口描述和 Binding 边界中。
 
-W3C WoT Architecture 将 Protocol Binding 描述为从 Interaction Affordance 到特定协议具体消息的映射。
+## 存量设备不必原生支持 TD
+
+看到 TD 的 JSON 表达后，很容易产生一个误解：是不是所有现场设备都要升级固件，自己提供 TD？
+
+不是。
+
+W3C WoT Architecture 明确考虑了 brownfield device、受限设备、休眠设备和专用协议设备。TD 可以由单独的服务提供，网关或代理也可以把传统设备暴露为一个 Web Thing。
+
+因此，现实中的接入链路可能是：
+
+```text
+传统设备
+  -> 现场协议
+  -> 网关或代理
+  -> TD + 网络接口
+  -> WoT Consumer
+```
+
+WoT 不是假装底层差异不存在，而是在适合的位置建立一个可供应用消费的统一接口。
+
+## Property、Action 和 Event 描述什么
+
+W3C WoT 使用三类 Interaction Affordance 描述 Consumer 可以怎样与 Thing 交互。
+
+### Property：Thing 的状态
+
+Property 表达可以读取、写入或观察的状态，例如：
+
+- 当前压力；
+- 电机转速；
+- 门锁状态；
+- 目标温度；
+- 设备运行模式。
+
+Property 不等于某一条遥测消息。它强调的是状态及其读、写、观察能力。
+
+它可以由 HTTP GET、CoAP 请求、Modbus 读取、MQTT 消息或 Zenoh Query 等不同机制实现。
+
+### Action：触发一个操作
+
+Action 表达调用者可以触发的功能或过程，例如：
+
+- 启动水泵；
+- 重启控制器；
+- 执行校准；
+- 开始固件升级；
+- 生成诊断报告。
+
+Action 可以定义输入与输出。它表达“调用某项能力”，而不是绑定到固定的 HTTP method、Topic 或寄存器写入。
+
+### Event：Thing 主动产生的通知
+
+Event 表达 Thing 产生的异步通知源，例如：
+
+- 过热告警；
+- 电机堵转；
+- 门被打开；
+- 作业完成；
+- 连接状态异常。
+
+Event 的传输可以使用 MQTT Subscription、Server-Sent Events、WebSocket、CoAP Observe、Zenoh Subscriber 或其他机制。
+
+WoT 关心的是通知在 Thing 接口中代表什么，Protocol Binding 再处理它如何传输。
+
+## Protocol Binding：把交互意图变成协议行为
+
+Protocol Binding 负责把 Interaction Affordance 映射到特定协议或 IoT 生态的消息。
 
 假设应用执行：
 
 ```text
-read Property "pressure"
+read Property "outletPressure"
 ```
 
-不同 Binding 可能产生完全不同的协议行为：
+不同 Binding 可能产生完全不同的行为：
 
 ```text
 HTTP Binding
-  -> GET https://example.com/pumps/17/pressure
+  -> GET https://edge.example.com/stations/17/pressure
 
-CoAP Binding
-  -> GET coap://example.com/pumps/17/pressure
+Modbus Binding
+  -> 读取指定 unit 和 register，再按数据模型解码
 
 MQTT Binding
   -> 根据约定发布请求、订阅响应并进行 correlation
@@ -315,40 +399,90 @@ Zenoh Binding
   -> 对某个 key expression 发起 query
 ```
 
-WoT 不要求这些协议表现得一模一样，也不会凭空抹平 QoS、请求响应、发布订阅和流式通信之间的差异。
+WoT 不要求这些协议表现得一模一样，也不会抹平 QoS、请求响应、发布订阅、轮询和流式通信的差异。
 
-它提供的是一个共同的上层接口，并要求具体 Binding 明确承担协议适配责任。
+它提供的是共同的上层交互模型，并要求具体 Binding 明确承担协议适配责任。
 
 这意味着：
 
-- MQTT 仍然可以使用 Topic、QoS 和会话机制；
+- MQTT 仍然使用 Topic、QoS 和会话机制；
 - HTTP 仍然使用 URL、method、header 和 status code；
-- Zenoh 仍然使用 key expression、query、put 和 subscriber；
-- 应用不必把这些协议概念作为操作 Thing 的唯一入口。
+- Modbus 仍然有 unit、function 和 register；
+- Zenoh 仍然有 key expression、query、put 和 subscriber；
+- 应用不必让这些协议概念散落到每一份业务代码中。
+
+## WoT 面对的是接口异构，不只是协议异构
+
+把问题概括为“协议太多”仍然不够准确。
+
+即使两个设备都使用 MQTT，它们也可能拥有完全不同的 Topic、Payload、命令响应和错误表达。
+
+即使两个服务都使用 HTTP，它们也可能对同一种“启动”能力采用不同的输入、鉴权、同步性和失败语义。
+
+反过来，同一个 Thing 的同一项能力也可能同时提供多个 Form，例如局域网内通过一种接口访问，远程运维时通过另一种接口访问。
+
+因此，WoT 需要同时描述：
+
+- 共同能力；
+- 数据约束；
+- 安全要求；
+- 具体访问入口；
+- 协议和生态专属元数据。
+
+WoT 并不能让真实差异自动消失。它做的是把差异集中到可以被发现、检查、测试和替换的边界中，而不是让业务系统各自维护一套隐含知识。
+
+## Thing 不只代表一块硬件
+
+WoT 中的 Thing 不是“联网硬件”的同义词。
+
+Thing 可以是：
+
+- 真实传感器；
+- 工业控制器；
+- 网关代理的传统设备；
+- 数字孪生；
+- 聚合多个设备能力的虚拟对象；
+- 通过网络接口提供交互的软件服务。
+
+前文中的“泵站”就可以是一个聚合 Thing。它的压力来自仪表，运行状态来自控制器，启动操作由控制服务完成，告警则来自另一个监测模块。
+
+上层应用不一定需要知道这些能力由几个物理设备和服务共同提供。它消费的是一个具有稳定接口的 Thing。
+
+这也解释了为什么 WoT 关注的不只是“设备接入”，而是物理或虚拟对象的网络接口。
 
 ## WoT 不是什么
 
-理解一个技术，知道它不负责什么同样重要。
+理解 WoT 的边界同样重要。
 
 ### WoT 不是统一传输协议
 
-WoT 不要求设备把已有协议替换成“WoT 协议”。它建立在现有协议和生态之上。
+WoT 不要求设备把现有协议替换成“WoT 协议”。它保留并补充已有标准和解决方案。
 
 ### WoT 不是完整物联网平台
 
-TD、Interaction Model 和 Protocol Binding 不会自动提供设备资产管理、时序数据存储、规则引擎、告警中心、多租户、计费、OTA 或可视化组态。
+TD、Interaction Model 和 Protocol Binding 不会自动提供：
 
-这些能力可以围绕 WoT 模型构建，但不属于 WoT Runtime 的全部责任。
+- 设备资产管理；
+- 时序数据存储；
+- 规则引擎；
+- 告警中心；
+- 多租户和计费；
+- OTA；
+- 可视化组态。
 
-### WoT 不是自动兼容所有设备的魔法层
+这些能力可以围绕 WoT 模型构建，但不都属于 WoT Runtime。
 
-一个设备没有可靠的接口文档、数据含义不明确，或者不同协议下的行为根本不等价，仅仅增加 TD 并不能消除这些问题。
+### WoT 不是自动兼容设备的魔法层
 
-TD 必须准确描述真实能力，Binding 也必须正确实现协议语义。错误的模型只会把错误变成机器可读格式。
+如果设备接口文档不可靠、数据含义不清楚，或者多个接口的行为根本不等价，增加一份 TD 并不能修复事实本身。
+
+TD 必须准确描述真实能力，Binding 也必须正确实现协议语义。错误模型只会把错误变成机器可读格式。
 
 ### WoT 不保证应用完全忽略协议差异
 
-某些场景确实需要感知协议能力，例如实时性、离线行为、QoS、流控或特定安全机制。协议中立不等于协议能力被抹平，而是这些差异通过明确的能力、策略和 Binding 边界暴露，而不是散落在所有业务代码中。
+实时性、离线行为、QoS、轮询频率、流控和安全机制在某些应用中仍然重要。
+
+协议中立不等于协议差异被删除，而是差异通过明确的能力、策略和 Binding 边界暴露，不再无控制地渗入所有业务模块。
 
 ## 只有 TD 还不够，为什么需要 WoT Runtime
 
@@ -358,14 +492,16 @@ TD 是描述，不会自行完成一次属性读取。
 
 - 解析并校验 TD；
 - 识别 Property、Action、Event 和操作类型；
-- 解析安全要求和数据 Schema；
+- 解析安全要求和 Data Schema；
 - 判断哪些 Form 可以使用；
 - 选择对应 Protocol Binding；
 - 构造并执行协议请求；
 - 校验和转换返回结果；
 - 管理调用、订阅、取消、资源和清理生命周期。
 
-因此，WoT 的价值不仅是给设备增加一份 JSON 文档。真正困难的工程问题，是如何把这份描述稳定地变成可执行交互。
+因此，WoT 的工程难点不只是“生成一份 JSON”。
+
+真正的问题是：如何把机器可读的描述稳定地变成可执行交互，并在失败、取消、更新和资源受限时保持清楚的责任边界。
 
 这也是 ClinkZ-WoT 关注的核心。
 
@@ -373,7 +509,7 @@ TD 是描述，不会自行完成一次属性读取。
 
 ClinkZ-WoT 的目标，是实现一个协议中立的 Rust WoT Runtime。
 
-主项目当前已经接受的架构方向大致是：
+主项目当前的 active design revision 是 **v5.0 bounded-core authority**。其规范中的主数据流可以概括为：
 
 ```text
 TD document or ProducedThing draft
@@ -385,21 +521,22 @@ parse + preserve extensions + validate
 capture immutable planning context
         |
         v
-logical plans
+shared planner
         |
-        v
-binding-owned protocol artifacts
+        +----> logical plans
         |
-        v
-admitted immutable plan set
-        |
-        v
-runtime interaction
+        +----> binding compiler extensions
+                       |
+                       v
+            admitted immutable plan set
+                       |
+                       v
+              runtime interaction
 ```
 
 这条链路试图保持两个边界。
 
-第一，运行时的共同部分处理协议中立事实：
+第一，运行时共同层处理协议中立事实：
 
 - 操作哪个 Thing；
 - 目标是哪个 Property、Action 或 Event；
@@ -414,11 +551,13 @@ runtime interaction
 - Zenoh key expression、query、subscriber 和编码设置；
 - 其他协议自己的通信与流控机制。
 
-主项目还规定：一旦某个决定已经进入不可变计划，执行阶段不应回到完整 TD 中重新发现同一个决定。这样做不仅考虑热路径开销，更重要的是让选择结果、所有权、资源预算和错误边界可以被验证。
+主项目还规定：一旦某个决定已经进入不可变计划，执行阶段不应回到完整 TD 中重新发现同一个决定。
 
-必须说明当前状态：截至本文基线，ClinkZ-WoT 仍在进行 v4.9 架构闭合，M1 和 M2 处于进行中。部分 Foundation 和 Core 切片已经完成，但完整的 Property Read 纵向链路、Planning、Protocol Binding SPI 与 Servient 集成尚未全部完成。
+这样做不仅考虑热路径开销，更重要的是让选择结果、所有权、资源预算和错误边界可以被验证。
 
-因此，这里描述的是已经接受的架构方向，不是完整运行时已经发布的声明。
+必须说明当前状态：截至本文基线，v5 authority 已经激活，但 M1 与 M2 仍在进行中，M3 Planning and Compilation Pipeline 尚未进入产品源码实现。WP-100 的部分 Foundation 与 Core 工作已经完成；计划中的 `clinkz-wot-planning` crate、Logical Plan、Binding Artifact、Binding Compiler 和完整 Property Read 计划链仍未落入产品 Rust 代码，现有 Protocol Binding 路径仍保留旧的直接执行边界。
+
+因此，这里描述的是 v5 已接受的目标架构，不是完整 WoT Runtime 已经发布的声明。
 
 ## 这如何落到 Rust 边界
 
@@ -444,31 +583,39 @@ Servient
 
 Rust 类型边界需要防止职责重新混在一起：
 
-- 协议中立请求不应携带某个具体 MQTT 或 HTTP 客户端对象；
+- 协议中立请求不应携带具体 MQTT、HTTP 或 Zenoh 客户端对象；
 - Binding Artifact 应由对应 Binding 拥有，Core 不应猜测其内部结构；
 - Servient 应拥有运行时编排权，而不是让 Binding 在隐藏任务中直接调用应用 Handler；
 - 调用和订阅需要明确的 owned value、generation、取消和终结清理路径；
 - Host 与 `no_std + alloc` 可以拥有不同推进机制，但应保持相同的交互语义。
 
-语义层没有消除复杂度。它把原本散落在各种接入代码中的复杂度，集中到了可以被检查、测试和治理的边界中。
+语义层没有消除复杂度。它把原本散落在接入代码和业务代码中的复杂度，集中到了可以被检查、测试和治理的边界中。
 
 ## 采用 WoT 需要付出什么
 
 WoT 并不是免费抽象。
 
-首先，团队必须认真建模。Property、Action 和 Event 的划分如果不准确，后续运行时再完善也无法弥补错误语义。
+首先，团队必须认真建模。Property、Action 和 Event 的划分如果不准确，运行时再完善也无法弥补语义错误。
 
-其次，每种协议或生态仍然需要可靠的 Protocol Binding。Binding 不只是把字符串地址换一种格式，它还要处理协议消息、序列化、安全、关联、订阅、流控和错误映射。
+其次，每种协议或生态仍然需要可靠的 Protocol Binding。Binding 不只是更换地址格式，它还要处理协议消息、序列化、安全、关联、订阅、轮询、流控和错误映射。
 
 再次，运行时必须处理选择与生命周期。当一个 Interaction Affordance 存在多个 Form 时，哪个可用、哪个安全、是否允许回退、失败后谁清理，都需要明确规则。
 
-最后，并非所有项目都需要完整 WoT Runtime。一个范围固定、接口稳定、只服务单一应用的设备系统，直接使用已有协议 API 可能更简单。WoT 的价值主要出现在需要跨设备、跨协议、跨厂商或长期演进的系统中。
+最后，并非所有项目都需要完整 WoT Runtime。一个范围固定、接口稳定、只服务单一应用的系统，直接使用协议 API 或内部适配层可能更简单。
+
+WoT 的价值主要出现在这些条件逐渐出现时：
+
+- 设备来自多个时期和厂商；
+- 系统需要同时使用多种协议或平台；
+- 同一批能力会被多个应用长期复用；
+- 底层设备和接口会持续替换；
+- 团队希望把业务语义与接入细节分离。
 
 ## 总结
 
-1. W3C WoT 不发明新的通信协议。它在现有协议之上描述 Thing 的能力、数据和可执行交互。
-2. WoT 解决的不只是协议数量问题，而是不同设备和服务缺少共同、机器可读的接口模型。
-3. Thing Description 描述 Property、Action、Event、Schema、安全和 Form；Protocol Binding 再把这些交互映射到 HTTP、MQTT、CoAP、Zenoh 等具体协议。
+1. 多协议共存不是为了说明 WoT 而虚构的场景，而是设备寿命、场景约束、厂商生态和系统演进的自然结果。
+2. 统一 MQTT 或 HTTP 可以统一部分传输方式，但不会自动统一设备能力、数据含义和交互语义。
+3. W3C WoT 使用 TD 描述 Thing 的 Property、Action、Event、Schema、安全和 Form，再由 Protocol Binding 把交互映射到真实协议；WoT Runtime 则负责把描述变成可执行且可治理的调用。
 
 理解这一点之后，才能继续讨论下一层问题：Thing Description 究竟应该描述什么，又为什么不能把它写成一份运行时配置文件。
 
@@ -481,7 +628,7 @@ WoT 并不是免费抽象。
 
 ## 项目资料
 
-- ClinkZ-WoT commit: `6c01e07a446f51d413618474554b5eedcf5de23e`
+- ClinkZ-WoT commit: `f453f165c2ea775e5f0d10c36f1e419fcc1d79f3`
 - `README.md`
 - `PROJECT_STATE.md`
 - `PLAN.md`
@@ -489,19 +636,22 @@ WoT 并不是免费抽象。
 
 ## 外部资料
 
-- W3C Web of Things (WoT) Architecture 1.1
-- W3C Web of Things (WoT) Thing Description 1.1
-- W3C Web of Things (WoT) Binding Templates
-- W3C Web of Things (WoT) Discovery
+- [W3C Web of Things (WoT) Architecture 1.1](https://www.w3.org/TR/wot-architecture11/)
+- [W3C Web of Things (WoT) Thing Description 1.1](https://www.w3.org/TR/wot-thing-description11/)
+- [W3C Web of Things (WoT) Binding Templates](https://www.w3.org/TR/wot-binding-templates/)
+- [W3C Web of Things (WoT) Discovery](https://www.w3.org/TR/wot-discovery/)
+- [W3C Web of Things (WoT): Use Cases and Requirements, 2026-02-05](https://www.w3.org/TR/2026/NOTE-wot-usecases-20260205/)
 
 <!--
 内部事实分类：
 
+- 多协议共存、brownfield、跨协议交互和协议抽象：外部标准与 W3C use case 支持的现实问题。
+- 开篇泵站场景：用于组合说明真实系统约束的 CONCEPTUAL COMPOSITE，不声称对应某个具体项目。
 - W3C WoT 的 Thing、TD、Interaction Affordance 和 Protocol Binding 定义：外部标准事实。
 - ClinkZ-WoT 的协议中立、Servient 编排、不可变 Planning Context、Logical Plan、Binding Artifact 和 Compiled Plan Set：ACCEPTED_DESIGN。
-- v4.9 架构闭合、M1/M2 状态和当前阻塞：CURRENT PROJECT STATE。
-- 完整 Property Read、Planning、Binding SPI 和 Servient 集成：PLANNED / PARTIALLY IMPLEMENTED。
-- 文中示例接口和模块流程：CONCEPTUAL ILLUSTRATION。
+- v5.0 bounded-core authority、M1/M2/M3 状态和当前阻塞：CURRENT PROJECT STATE。
+- WP-100 部分 Foundation/Core 工作：IMPLEMENTED；Planning、Binding Compiler/Artifact 与完整 Property Read 计划链：PLANNED / NOT YET IMPLEMENTED。
+- 文中 TD、接口和模块流程：CONCEPTUAL ILLUSTRATION。
 
 发布前检查：
 
@@ -511,6 +661,7 @@ WoT 并不是免费抽象。
 - [x] 已区分 implemented / accepted / planned
 - [x] 未把 MQTT 或其他协议描述为 WoT 的竞争者
 - [x] 未虚构公开 Rust API、性能或规模结论
+- [x] 已用 W3C use case 验证现实中的多协议与跨协议问题
 - [ ] 完成作者理解校验
 - [ ] 完成第二轮技术事实校验
 - [ ] 回填知乎发布信息
