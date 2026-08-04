@@ -1,20 +1,20 @@
 ---
 id: "WOT-002"
-title: "重新理解 WoT | TD、网关与 Directory 在真实系统中如何协作"
-subtitle: "从业务能力建模，到网关暴露 Thing，再到应用发现和消费 TD"
+title: "重新理解 WoT | 现场设备不支持 WoT，Thing Description 从哪里来？"
+subtitle: "从业务能力建模、现场点位映射，到网关暴露 Thing 与 Directory 发现"
 series: "重新理解 WoT"
 series_order: 2
 status: "DRAFTING"
 author: "yushun1990"
 created: "2026-07-29"
-updated: "2026-07-29"
-summary: "在真实项目中，Thing Description 通常不是由业务人员逐字段手写，也不要求现场设备原生支持 WoT。业务与工艺人员定义 Thing 应提供的能力，集成人员将现场协议和点位映射到这些能力，网关或平台生成并托管具体 TD，Directory 再帮助应用发现合适的 Thing。本文用一条完整的数据流说明设备、网关、TD Server、Thing Description Directory、Consumer 与 WoT Runtime 分别承担什么责任。"
+updated: "2026-08-04"
+summary: "Thing Description 并不要求由现场设备生成，也不应由某一个人逐字段手写。业务人员定义 Thing 应提供的能力，集成人员完成现场协议和点位映射，网关或平台生成具体 TD 并暴露可执行接口，Directory 则可选地帮助应用发现这些 Thing。"
 
 clinkz_wot:
   repository: "https://github.com/yushun1990/clinkz-wot"
   branch: "master"
-  commit: "f453f165c2ea775e5f0d10c36f1e419fcc1d79f3"
-  inspected_at: "2026-07-29"
+  commit: "30485b1a51470f328e79453ba0e82e3358c14f79"
+  inspected_at: "2026-08-04"
 
 publication:
   platform: "zhihu"
@@ -27,7 +27,6 @@ related:
   articles:
     - "WOT-001"
     - "WOT-003"
-    - "WOT-006"
   docs:
     - "docs/architecture/10-primary-data-flows.md"
     - "docs/work-packages/WP-500-discovery.md"
@@ -38,161 +37,252 @@ related:
   tests: []
 ---
 
-# 重新理解 WoT | TD、网关与 Directory 在真实系统中如何协作
+# 重新理解 WoT | 现场设备不支持 WoT，Thing Description 从哪里来？
 
-> 本文基于 ClinkZ-WoT commit `f453f165c2ea775e5f0d10c36f1e419fcc1d79f3`。
+> 本文基于 ClinkZ-WoT commit `30485b1a51470f328e79453ba0e82e3358c14f79`。
 >
-> ClinkZ-WoT 当前已经实现 TD/TM 数据结构、序列化、反序列化、校验和扩展成员保留。本文最后讨论的 Discovery 与 Directory 客户端边界属于 active v5 架构；对应 WP-500 仍处于计划阶段，不能理解为完整 Directory 客户端已经实现。
+> ClinkZ-WoT 已经具有 Thing Description 与 Thing Model 的数据结构、序列化、反序列化、校验和扩展成员保留能力。本文最后涉及的 Discovery 与 Directory 客户端边界属于 active v5 架构，WP-500 仍处于计划阶段，不能理解为完整 Directory 客户端已经实现。
 
-上一篇文章解释了 W3C WoT 为什么存在：真实系统即使已经打通通信，上层应用仍然缺少共同、机器可读的 Thing 接口。
+上一篇文章解释了 W3C Web of Things 为什么存在。
 
-但是仅仅知道“TD 描述 Property、Action 和 Event”仍然不够。
+真实物联网系统即使已经通过 MQTT、HTTP、Modbus 或其他协议打通通信，上层应用仍然缺少一套共同、机器可读的 Thing 接口。
 
-在真实项目中，人们很快会遇到更实际的问题：
+Thing Description（TD）可以描述一个 Thing 的 Property、Action、Event、数据结构、安全要求和访问入口。
 
-- 现场设备根本不支持 WoT，TD 从哪里来？
-- 一个 PLC、几块仪表和一个变频器，应该分别建立 Thing，还是组合成一个泵站 Thing？
-- TD 应该放在设备里、网关里，还是平台里？
+但理解到这里，新的问题马上出现了：
+
+> 现场的 PLC、仪表和控制器根本不认识 WoT，它们怎么可能提供 TD？
+
+更具体地说：
+
+- 一块只能读取 Modbus 寄存器的压力仪表，TD 从哪里来？
+- 一个泵站应该建立一个 Thing，还是把 PLC、变频器和仪表分别建成 Thing？
+- TD 应该保存在设备、网关还是云平台？
+- 是不是需要业务人员手写大量 JSON-LD？
 - Directory 是不是所有设备数据都必须经过的中心节点？
-- 应用找到 TD 以后，究竟怎样调用真实设备？
-- 编写 TD 的人需要懂 HTTP、MQTT、Modbus 和 JSON-LD 吗？
+- 应用找到 TD 后，又是谁真正操作现场设备？
 
-这些问题比罗列 TD 字段更接近 WoT 的实际应用。
+这些问题比逐个解释 TD 字段更接近真实工程。
 
-本文用一个供水泵站的完整接入过程，解释 Thing Model、Thing Description、网关、TD Server、Thing Description Directory、Consumer 和 WoT Runtime 如何协作。
+本文继续使用一个供水泵站，完整走一遍从现场设备到 WoT Consumer 的接入过程。
 
-## 先从一个真实的角色分工开始
+## 一个泵站里，并不存在现成的 Thing
 
 假设一个泵站包含：
 
-- PLC；
-- 压力仪表；
-- 流量计；
-- 变频器；
-- 电机保护装置；
+- 一台 PLC；
+- 一块出口压力仪表；
+- 一台流量计；
+- 一台变频器；
+- 一套电机保护装置；
 - 一台工业网关。
 
-现场设备可能使用 Modbus RTU、Modbus TCP、OPC UA 或厂商私有协议。业务系统并不想直接操作寄存器地址，而是希望看到：
+现场可能同时存在 Modbus RTU、Modbus TCP、OPC UA 和厂商私有协议。
+
+对于设备集成人员来说，泵站可能表现为：
+
+```text
+Modbus register 40021
+PLC status word bit 3
+PLC coil 00017
+motor protector alarm code 7
+```
+
+但业务系统并不想直接操作这些地址。
+
+业务真正关心的是：
 
 ```text
 Property: outletPressure
 Property: targetPressure
 Property: runningState
+
 Action: start
 Action: stop
+
 Event: overload
 ```
 
-这里至少涉及三类人员。
+从寄存器、状态位和厂商报文，到 Property、Action 和 Event，中间还缺少一次建模和映射。
 
-### 工艺或业务人员知道“它应该做什么”
+这个过程不会因为引入 WoT 而自动完成。
 
-工艺人员知道：
+## TD 通常不是由一个人手写出来的
 
-- 出口压力的业务含义；
-- 正常范围和单位；
-- 哪些状态允许修改；
-- 启停操作需要哪些前置条件；
-- 什么情况应产生过载告警。
+一份可以真实运行的 TD，同时包含业务知识、设备知识和网络接口信息。
 
-他们不一定知道压力值来自 PLC 的哪个寄存器，也不需要知道最终通过 HTTP、MQTT 还是 Zenoh 暴露。
+很少有人能够独立掌握这三部分。
 
-### 设备与集成人员知道“现场接口在哪里”
+更合理的方式，是把责任分给不同角色。
 
-集成人员知道：
+### 工艺人员定义“这个对象应该提供什么”
 
-- `40021` 寄存器代表出口压力；
-- 某个线圈控制启动；
-- 变频器运行状态需要怎样解码；
-- 电机保护装置怎样上报告警；
-- 哪些操作必须在本地网关中执行联锁检查。
+工艺或业务人员知道：
 
-他们负责把现场协议和点位映射为稳定的 Thing 能力。
+- 出口压力代表什么；
+- 使用什么单位；
+- 正常范围是多少；
+- 哪些状态只能读取；
+- 启停操作需要满足什么条件；
+- 什么情况应该产生过载告警。
 
-### 平台或运行时知道“怎样把能力暴露给应用”
+他们适合定义稳定的业务能力：
 
-平台与 WoT Runtime 决定：
+```text
+outletPressure
+targetPressure
+runningState
+start
+stop
+overload
+```
 
-- 为哪些 Thing 生成具体 TD；
-- TD 中使用哪些 Form；
-- 通过哪个网关或服务接收调用；
-- 如何发布、注册和更新 TD；
+但他们通常不知道：
+
+- 压力来自哪个寄存器；
+- 状态位怎样解码；
+- 最终使用 HTTP、MQTT 还是 Zenoh；
+- Consumer 应该访问哪个网络地址。
+
+业务人员不应该为了建立 Thing 模型，被迫学习所有现场协议。
+
+### 集成人员定义“这些能力在现场对应什么”
+
+设备或系统集成人员知道：
+
+```text
+outletPressure
+  <- Modbus register 40021
+  <- unsigned 16-bit integer
+  <- scale 0.01
+  <- unit kPa
+
+runningState
+  <- PLC status word bit 3
+
+start
+  -> write PLC coil 00017
+
+overload
+  <- motor protector alarm code 7
+```
+
+他们负责确认：
+
+- 点位和寄存器地址；
+- 编码与字节序；
+- 比例系数；
+- 读写方式；
+- 控制时序；
+- 告警来源；
+- 现场联锁。
+
+这一层负责把真实设备行为映射成稳定的 Thing 能力。
+
+### 网关或平台定义“应用怎样访问这些能力”
+
+平台和 WoT Runtime 还需要决定：
+
+- 为哪些对象生成 TD；
+- 给 Thing 分配什么 ID；
+- 通过哪些 Form 暴露交互；
+- 使用什么安全机制；
+- TD 保存在哪里；
+- 是否把 TD 注册到 Directory；
 - Consumer 获取 TD 后怎样执行交互。
 
-因此，TD 通常不是某一个角色从头手写到底的文件。
-
-更现实的过程是：
+因此，一份具体 TD 更可能是多类信息组合后的产物：
 
 ```text
 工艺知识
-  -> Thing 能力模型
-  -> 现场协议与点位映射
-  -> 网关/平台生成具体 TD
-  -> 发布或注册 TD
-  -> 应用发现并消费 TD
+    |
+    v
+Thing 能力模型
+    |
+    v
+现场协议和点位映射
+    |
+    v
+网关或平台生成具体 TD
+    |
+    v
+托管或注册 TD
+    |
+    v
+Consumer 获取并消费 TD
 ```
 
-## Thing Model：先描述“一类设备应该具有什么能力”
+TD 是这个过程的结果，而不是整个过程的起点。
 
-如果一个项目有几百个同型号泵站，没有必要让每个站点重新定义一遍业务能力。
+## 先定义一类泵站，再创建具体实例
+
+如果项目中有几百个同类型泵站，没有必要为每个泵站重新讨论一次能力名称、数据类型和单位。
 
 可以先建立一个 Thing Model：
 
 ```text
 PumpStation Model
-  properties:
-    outletPressure
-    targetPressure
-    runningState
 
-  actions:
-    start
-    stop
+properties:
+  outletPressure
+  targetPressure
+  runningState
 
-  events:
-    overload
+actions:
+  start
+  stop
+
+events:
+  overload
 ```
 
-Thing Model 更接近一类 Thing 的能力模板。
+Thing Model 描述的是一类 Thing 应该具有什么能力。
 
-它可以规定：
+它可以定义：
 
-- Property、Action 和 Event 的名称与含义；
-- 数据类型、单位、范围和枚举；
-- 哪些能力是必需的，哪些是可选的；
-- 可复用的领域语义和元数据。
+- Property、Action 和 Event；
+- 数据类型与单位；
+- 数值范围；
+- 枚举值；
+- 必选和可选能力；
+- 可复用的领域语义。
 
-此时设备可能尚未安装，IP 地址、网关地址、设备编号和具体协议入口都还不存在。
+此时泵站可能尚未安装。
 
-W3C WoT Architecture 将 Thing Model 定义为一类具有相同能力的 Thing 的描述。与具体 TD 相比，Thing Model 不包含足够的信息去识别并操作某一个实例。
+设备编号、IP 地址、网关位置和具体协议入口都还没有确定。
 
-这与实际项目中的角色分工很吻合：业务和工艺人员更适合参与定义 Thing Model，而不是负责填写每个现场实例的网络地址。
-
-## Thing Description：把能力模板实例化为可交互的 Thing
-
-当 `Pump Station 17` 完成部署后，系统才能生成具体 TD。
-
-这份 TD 会补充实例信息，例如：
+等到 `Pump Station 17` 真正完成部署后，平台再根据 Thing Model、实例信息和现场映射生成具体 TD：
 
 ```text
 id:
   urn:example:pump-station:17
 
+title:
+  Pump Station 17
+
 location:
-  青岛某供水区域
+  Qingdao Water Supply Area A
 
 forms:
-  通过 edge-gateway-03 提供的网络入口访问
+  通过 edge-gateway-03 暴露
 
 security:
   需要 operator 权限
 ```
 
-TD 描述的不只是“这类泵站通常具有什么能力”，而是：
+Thing Model 回答的是：
 
-> 这个具体 Thing 现在提供哪些交互，以及 Consumer 应怎样访问它。
+> 这类对象通常具有什么能力？
 
-例如，泵站 TD 的一部分可能是：
+Thing Description 回答的是：
+
+> 这个具体对象是谁，现在可以通过什么接口操作？
+
+## 现场设备不需要原生支持 WoT
+
+假设 `outletPressure` 最终通过网关的 HTTPS 接口暴露。
+
+概念性的 TD 片段可能是：
 
 ```json
 {
@@ -210,86 +300,97 @@ TD 描述的不只是“这类泵站通常具有什么能力”，而是：
         }
       ]
     }
-  },
-  "actions": {
-    "start": {
-      "forms": [
-        {
-          "href": "https://edge-03.example.com/things/pump-17/actions/start",
-          "op": "invokeaction"
-        }
-      ]
-    }
   }
 }
 ```
 
-这并不意味着压力仪表和 PLC 原生支持 HTTP。
+这并不意味着压力仪表原生支持 HTTPS，也不意味着仪表内部保存着这份 JSON。
 
-TD 中的 Form 指向网关提供的网络接口，而网关内部再把交互转换为现场协议。
+真实的数据流可能是：
 
 ```text
 Consumer
-  -> read Property "outletPressure"
-  -> HTTPS Form on gateway
-  -> gateway mapping
-  -> Modbus register 40021
-  -> pressure value
+    |
+    | read Property "outletPressure"
+    v
+Gateway HTTPS Form
+    |
+    | 根据映射执行现场访问
+    v
+Modbus register 40021
+    |
+    | 解码、缩放、转换
+    v
+Pressure value
 ```
 
-Thing Description 因此成为业务能力与真实通信入口之间的连接点。
+TD 中的 Form 指向网关提供的网络入口。
 
-## 现场设备不需要原生理解 WoT
+网关再根据内部映射读取真实寄存器，并把结果转换成 TD 声明的数据结构。
 
-这是 WoT 实际落地时最重要的一点。
-
-大量存量设备：
-
-- 无法修改固件；
-- 没有能力托管 JSON 文档；
-- 只暴露寄存器、串口帧或厂商接口；
-- 可能长期离线或只在特定时段唤醒。
-
-W3C WoT 并不要求它们重新实现一套 WoT 协议栈。
-
-Thing Description 可以由设备自己提供，也可以由外部服务托管。对于资源受限设备和后接入 WoT 的存量设备，由网关或平台提供 TD 是标准明确支持的模式。
-
-因此，一个设备成为 Web Thing，不等于它必须亲自完成所有工作。
-
-更准确地说：
+因此，一个传统设备成为可被 WoT Consumer 使用的 Thing，并不要求设备自己实现 WoT：
 
 ```text
-物理设备
-  + 外部描述
-  + 可以执行该描述中交互的网络入口
-  = 可以被 WoT Consumer 使用的 Thing
+传统设备
+  + 外部提供的 Thing Description
+  + 能够执行 TD 中交互的网关或代理
+  = 可供 Consumer 使用的 Thing
 ```
 
-## 网关不只是“协议转换器”
+这对存量设备尤其重要。
 
-在传统物联网架构中，网关常被理解为：
+许多工业设备：
+
+- 无法修改固件；
+- 只有串口或现场总线；
+- 没有能力托管 JSON 文档；
+- 可能通过专用网关访问；
+- 可能只在特定时间上线。
+
+要求这些设备全部原生实现 WoT，既不现实，也没有必要。
+
+## 网关不只是把 Modbus 转成 MQTT
+
+传统网关经常被理解成一个协议转换器：
 
 ```text
 Modbus -> MQTT
 ```
 
-但在 WoT 系统中，网关可以承担更完整的 Intermediary 角色。
+这种转换解决了消息怎样进入平台的问题，但不一定形成稳定的业务接口。
 
-它可能同时负责：
+例如，网关可能只是把寄存器值包装成：
+
+```json
+{
+  "40021": 352,
+  "40022": 1,
+  "40023": 0
+}
+```
+
+上层应用仍然需要知道：
+
+- `40021` 代表出口压力；
+- 数值需要乘以 `0.01`；
+- `40022` 的不同位代表什么；
+- 哪个值可以写；
+- 写入前是否需要联锁检查。
+
+WoT 网关可以承担更完整的 Intermediary 角色：
 
 - 连接现场设备；
-- 将寄存器、Topic 或私有接口映射为 Property、Action 和 Event；
-- 聚合多个物理设备，形成一个虚拟 Thing；
-- 提供对外的 HTTP、MQTT、CoAP 或 Zenoh 接口；
-- 执行本地校验、联锁和访问控制；
+- 将寄存器、Topic 和厂商接口映射成 Property、Action 与 Event；
+- 组合多个物理设备；
+- 形成更符合业务边界的虚拟 Thing；
 - 生成或补全具体 TD；
 - 托管 TD；
+- 暴露 HTTP、MQTT、CoAP 或 Zenoh Form；
+- 执行本地校验、鉴权和联锁；
 - 将 TD 注册到 Directory；
-- 在本地设备不可直接访问时代理实际交互。
+- 代理 Consumer 与真实设备之间的交互。
 
-W3C WoT Architecture 中的 Edge Device 通常同时具有本地计算和跨协议桥接能力；Intermediary 则可以代理、增强或虚拟化其他 Thing。
-
-对于前面的泵站，网关可以把多个现场设备组合为一个更符合业务边界的虚拟 Thing：
+对于泵站，可以把多个现场组件组合成一个 Thing：
 
 ```text
 压力仪表 ----+
@@ -299,35 +400,83 @@ PLC ---------+--> Gateway --> PumpStation Thing
 保护装置 ----+
 ```
 
-业务应用面对的是“泵站”，而不是被迫分别操作五种现场设备。
+业务应用面对的是“泵站”，而不是五个没有业务关系的通信端点。
 
-当然，也可以为压力仪表、变频器和泵站分别建立 TD。究竟怎样划分 Thing，不由协议决定，而由业务边界、权限边界、生命周期和复用方式决定。
+## 一个泵站应该是一个 Thing，还是多个 Thing？
 
-## TD 放在哪里：设备、网关和平台都可能
+这个问题没有唯一答案。
 
-W3C WoT 并不规定 TD 必须与物理设备存放在一起。
+可以把整个泵站建模为一个 Thing：
 
-常见方式有三种。
+```text
+PumpStation Thing
+  - outletPressure
+  - flow
+  - runningState
+  - start
+  - stop
+  - overload
+```
 
-### 方式一：Thing 自己托管 TD
+也可以分别建立：
 
-具备完整网络能力的设备或服务可以提供自己的 TD。
+```text
+PressureSensor Thing
+FlowMeter Thing
+PLC Thing
+FrequencyConverter Thing
+PumpStation Thing
+```
+
+甚至可以同时存在。
+
+底层使用几种协议，并不能直接决定 Thing 的边界。
+
+更应该考虑以下因素。
+
+### 业务边界
+
+应用真正操作的是一块仪表，还是一个完整泵站？
+
+### 生命周期
+
+压力仪表是否会独立更换、独立维护和独立登记？
+
+### 权限边界
+
+读取压力和启动水泵是否属于不同权限？
+
+### 复用方式
+
+其他应用是否需要单独消费流量计或变频器？
+
+### 故障边界
+
+一个组件离线时，整个 Thing 是否仍能提供部分能力？
+
+因此，Thing 首先是一个接口和生命周期边界，而不是物理外壳的机械映射。
+
+## TD 应该保存在哪里？
+
+TD 不一定保存在物理设备中。
+
+常见方式大致有三种。
+
+### Thing 自己提供 TD
+
+具有完整网络能力的设备或软件服务，可以直接托管自己的 TD：
 
 ```text
 Consumer
-  -> 获取设备自己的 TD
-  -> 根据 TD 中的 Form 直接交互
+  -> 获取 Thing 自己的 TD
+  -> 根据 Form 直接交互
 ```
 
-这种模式适合：
+这种方式适合原生支持 WoT、长期在线并且可以直接访问的设备或服务。
 
-- 原生支持 WoT 的设备；
-- 网络长期在线的服务；
-- 点对点或较小规模系统。
+### 网关或代理托管 TD
 
-### 方式二：网关或代理服务托管 TD
-
-存量设备和资源受限设备通常更适合这种模式。
+存量设备和资源受限设备更适合由网关托管：
 
 ```text
 Legacy Device
@@ -335,99 +484,107 @@ Legacy Device
       v
 Gateway / Intermediary
   - 托管 TD
-  - 暴露网络接口
+  - 暴露 Form
   - 转换现场协议
 ```
 
-TD 描述的 Thing 可以是单个设备，也可以是网关聚合出的虚拟对象。
+TD 描述的可以是一台设备，也可以是网关聚合出的虚拟 Thing。
 
-### 方式三：平台或 Directory 集中管理 TD
+### 平台或 Directory 管理 TD
 
-当系统中存在大量动态设备、多个网关和多个应用时，应用不可能预先知道每个 TD 的 URL。
+当系统中有大量 Thing、多个网关和多个应用时，应用很难预先知道每一份 TD 的地址。
 
-这时可以把 TD 注册到 Thing Description Directory。
+这时可以把 TD 注册到 Thing Description Directory：
 
 ```text
-Gateway A --register--> Directory
-Gateway B --register--> Directory
-Cloud Thing --register-> Directory
+Gateway A ----register----+
+Gateway B ----register----+--> Directory
+Cloud Thing --register----+
 
-Application --search--> Directory
-Application <--TD------- Directory
+Application ---search----> Directory
+Application <----TD------- Directory
 ```
 
-这三种方式并不互斥。
+网关可以继续托管原始 TD，同时将其登记到 Directory。
 
-一个网关可以自己托管 TD，同时把 TD 注册到 Directory；Directory 保存的是可检索副本或登记信息，具体交互仍然按照 TD 中的 Form 执行。
+这三种方式并不冲突。
 
-## TD Server 与 Directory 不是同一个东西
+## TD Server 和 Directory 不是一回事
 
-为了理解 TD 的分发，需要区分两个概念。
+理解 TD 的分发过程时，需要区分两个概念。
 
-### Thing Description Server：提供一份 TD
+### TD Server：通过已知地址取得一份 TD
 
-Thing Description Server 本质上是一个可以通过 URL 获取 TD 的 Web 资源。
-
-它可能位于：
+TD Server 可以是：
 
 - Thing 自身；
 - 网关；
 - 边缘服务；
-- 云端设备管理平台；
+- 云平台；
 - 静态 Web 服务。
 
-TD Server 的核心问题是：
+它解决的问题是：
 
-> 已经知道地址后，怎样取得这份 TD？
+> 我已经知道地址，怎样取得这份 TD？
 
-### Thing Description Directory：管理一组 TD
+### Thing Description Directory：管理和查找一组 TD
 
-Thing Description Directory 管理描述其他 Thing 的 TD 集合，并提供登记、读取、更新、删除、列举以及可选搜索能力。
+Directory 管理描述其他 Thing 的 TD 集合。
 
-Directory 解决的问题是：
+它可以提供：
 
-> 当系统中有很多 Thing，而且调用方事先不知道具体地址时，怎样找到符合条件的 TD？
+- 注册；
+- 读取；
+- 更新；
+- 删除；
+- 列举；
+- 搜索。
 
-因此：
+它解决的问题是：
+
+> 系统中存在大量 Thing，我怎样找到符合条件的 TD？
+
+两者的区别可以概括为：
 
 ```text
 TD Server
-  -> 根据已知 URL 获取一份 TD
+  -> 从已知 URL 获取一份 TD
 
 Directory
   -> 在一组 TD 中登记、管理和查找
 ```
 
-Directory 自己也是一个网络服务，甚至可以拥有描述自身接口的 TD。
-
 ## Directory 不是设备数据总线
 
-这是实际应用中很容易产生的误解。
+看到“所有 TD 都注册到 Directory”，很容易把 Directory 想成 WoT 系统的中心节点。
 
-Directory 保存和检索的是 Thing Description，也就是接口元数据；它不等于：
+但 Directory 管理的是接口元数据，不是设备运行数据。
+
+它不等于：
 
 - MQTT Broker；
 - 时序数据库；
 - 遥测数据中心；
+- 规则引擎；
 - 设备消息路由器；
-- 每次 Property Read 的中转站；
-- 每次 Event 的转发服务。
+- 每次属性读取的中转站；
+- 每个 Event 的转发服务。
 
-典型交互流程是：
+典型流程是：
 
 ```text
 1. Application 查询 Directory
 2. Directory 返回目标 Thing 的 TD
-3. Application / WoT Runtime 解析 TD
-4. Runtime 根据 Form 与目标 Thing 交互
+3. Consumer Servient 解析并消费 TD
+4. Runtime 根据 TD 中的 Form 与 Thing 交互
 ```
 
-第 4 步可能直接访问设备，也可能访问网关或云端 Intermediary，取决于 TD 中的 Form。
+完整关系更接近：
 
 ```text
                  +----------------+
                  |   Directory    |
-                 |  stores TDs    |
+                 |   stores TDs   |
                  +-------+--------+
                          ^
                     search/register
@@ -439,17 +596,17 @@ Application ------------+
 Gateway / Thing -----------------> Physical Device
 ```
 
-Directory 不必位于实际调用的数据路径上。
+Directory 通常不位于每一次设备调用的数据路径上。
 
-如果 TD 的 Form 指向网关，那么网关位于调用路径；如果 Form 指向设备本身，则 Consumer 可以直接访问设备。
+真正的交互访问网关还是设备本身，由 TD 中的 Form 决定。
 
-## 应用怎样从“发现”走到“调用”
+## 从设备接入到应用调用的完整过程
 
-把整个过程连起来，可以得到一条更实际的数据流。
+现在把整个过程连接起来。
 
 ### 第一步：定义业务能力
 
-工艺和业务人员定义泵站需要向外提供：
+业务或工艺人员定义：
 
 ```text
 outletPressure
@@ -459,11 +616,11 @@ stop
 overload
 ```
 
-这些能力可以先进入 Thing Model、设备模板或平台中的领域模型。
+这些能力可以先进入 Thing Model、设备模板或平台领域模型。
 
-### 第二步：配置现场映射
+### 第二步：建立现场映射
 
-集成人员告诉网关：
+集成人员建立能力与真实点位的关系：
 
 ```text
 outletPressure
@@ -479,47 +636,62 @@ overload
   <- motor protector alarm code 7
 ```
 
-这一步属于设备接入和 Binding 实现，不是让业务人员理解寄存器协议。
+### 第三步：形成可以暴露的 Thing
 
-### 第三步：网关形成可对外暴露的 Thing
-
-网关将现场映射与业务模型结合，形成一个 ProducedThing 或等价的内部对象，并生成具体 TD：
+网关或平台将业务模型与现场映射组合起来：
 
 - 分配 Thing ID；
-- 填入实例元数据；
+- 加入实例元数据；
+- 声明数据结构；
+- 配置安全要求；
 - 生成对外 Form；
-- 声明安全要求；
-- 暴露网络路由。
+- 建立实际网络路由。
 
 ### 第四步：发布 TD
 
-规模较小时，可以把 TD URL 静态配置给应用，或者由网关直接提供 TD。
+规模较小时，可以：
 
-规模较大时，网关把 TD 注册到 Directory。
+- 让网关直接提供 TD；
+- 把 TD URL 静态配置给应用；
+- 将 TD 文件随应用部署。
+
+规模较大时，可以把 TD 注册到 Directory。
 
 ### 第五步：应用发现目标 Thing
 
-应用可以按照系统支持的查询方式查找：
+应用可以按照系统支持的条件查找：
 
-- 指定 Thing ID；
-- 指定设备类型；
-- 指定位置；
-- 指定某项 Property、Action 或 Event；
-- 指定领域语义标签。
+- Thing ID；
+- 类型；
+- 位置；
+- 所具有的 Property、Action 或 Event；
+- 领域语义标签。
 
-Directory 返回一个或多个 TD。具体能否按照语义或复杂条件检索，取决于 Directory 的实现和它支持的查询能力。
+Directory 返回一个或多个 TD。
+
+具体支持哪些搜索方式，由 Directory 的实现决定。
 
 ### 第六步：WoT Runtime 消费 TD
 
-Consumer 所在的 Servient 获取 TD 后：
+Consumer 所在的 Servient 获取 TD 后执行：
 
 ```text
 TD document
-  -> parse and validate
-  -> create ConsumedThing
-  -> application requests read/invoke/subscribe
-  -> select Form
-  -> Protocol Binding executes communication
+    |
+    v
+parse and validate
+    |
+    v
+create ConsumedThing
+    |
+    v
+application requests read/invoke/subscribe
+    |
+    v
+select Form
+    |
+    v
+Protocol Binding executes communication
 ```
 
 应用表达的是：
@@ -536,58 +708,22 @@ GET 某个 URL
 订阅某个 Topic
 ```
 
-具体协议行为由 TD、Form、Protocol Binding 和网关映射共同完成。
+具体访问行为由 TD、Form、Protocol Binding 和网关映射共同完成。
 
-## 一个完整的部署图
+## 什么时候不需要 Directory？
 
-前面的角色可以组合为：
+Directory 是可选的系统组件，不是使用 WoT 的前置条件。
 
-```text
-                       business / process experts
-                                  |
-                                  v
-                         Thing Model / template
-                                  |
-                                  v
-field devices --> gateway mapping + WoT runtime
- Modbus/OPC UA       |             |
- vendor protocol     |             +--> exposes network Forms
-                     |             +--> hosts concrete TD
-                     |             +--> registers TD
-                     |                       |
-                     v                       v
-               physical operation       TD Directory
-                                              |
-                                        search / retrieve
-                                              |
-                                              v
-                                       Consumer Servient
-                                              |
-                                       ConsumedThing API
-                                              |
-                                      read / write / invoke
-                                              |
-                                              v
-                                    gateway Form or direct Form
-```
+以下场景通常不需要 Directory：
 
-这张图中没有要求所有设备支持 WoT，也没有要求所有流量经过 Directory。
-
-WoT 统一的是 Thing 的描述和交互入口，而不是强行统一现场设备的实现方式。
-
-## 什么时候根本不需要 Directory
-
-Directory 是可选组件，不是构造 Servient 的前置条件。
-
-以下场景可能不需要 Directory：
-
-- 应用只操作一个已知设备；
+- 应用只操作少量已知设备；
 - TD 随应用一起部署；
-- Thing 的 TD URL 固定；
-- 局域网通过简单发现机制即可找到 TD；
-- 系统规模小，静态配置比运行时检索更可靠。
+- TD URL 长期固定；
+- 系统使用静态配置；
+- 局域网已有简单发现机制；
+- 运行时检索带来的复杂度高于收益。
 
-例如：
+最简单的系统完全可以这样运行：
 
 ```text
 Application
@@ -596,110 +732,151 @@ Application
   -> interact
 ```
 
-当这些情况出现时，Directory 才开始体现价值：
+当下面的问题逐渐出现时，Directory 才更有价值：
 
-- Thing 数量多且持续变化；
-- 多个网关不断加入和离开；
+- Thing 数量较多并持续变化；
+- 网关会动态加入或离开；
 - 多个应用需要共享设备元数据；
-- 需要按照能力、位置、类型或语义查找 Thing；
-- 需要集中控制谁能查看哪些 TD；
-- TD 需要更新、版本和生命周期管理。
+- 应用需要按照能力、位置或类型搜索 Thing；
+- TD 需要统一更新和版本管理；
+- 不同用户只能查看特定 TD。
 
-因此，Directory 属于系统级元数据基础设施，而不是 WoT Runtime 的必备内核。
+Directory 更接近系统级元数据基础设施，而不是 WoT Runtime 必须内置的功能。
 
-## TD 更新时，谁负责什么
+## TD 变化以后会发生什么？
 
-真实系统中的 TD 不是永远不变的。
+TD 并不是永远不变的静态文件。
 
-以下变化可能产生新的 TD：
+以下变化都可能产生新的 TD：
 
-- Thing 新增或删除能力；
+- 新增或删除能力；
 - 网关地址改变；
-- 对外协议或 Form 改变；
+- Form 改变；
+- 对外协议改变；
 - 安全要求改变；
-- Thing 从一个网关迁移到另一个网关；
-- 原来的本地 Thing 被云端 shadow 或代理替代。
+- Thing 迁移到另一台网关；
+- 本地设备改由云端代理。
 
-通常由拥有暴露接口的一方生成或更新 TD：
+通常由拥有暴露接口的一方更新 TD：
 
 ```text
 Thing / Gateway / Platform
-  -> update TD
-  -> update TD Server resource
-  -> re-register or update Directory entry
+    |
+    v
+generate updated TD
+    |
+    v
+update TD Server resource
+    |
+    v
+update Directory entry
 ```
 
-Directory 负责保存和分发新的描述，但不会自动保证某个已经运行的 Consumer 如何迁移。
+Directory 可以保存和分发新的描述，但它不能自动替已经运行的 Consumer 决定：
 
-Consumer 或 WoT Runtime 仍需要决定：
+- 什么时候重新获取 TD；
+- 是否接受新的接口；
+- 旧调用怎样结束；
+- 已建立的订阅怎样取消；
+- 新 TD 是否应当进入新的 generation；
+- 旧资源何时可以安全清理。
 
-- 何时重新获取 TD；
-- 是否接受新的接口版本；
-- 旧的调用和订阅如何结束；
-- 新 TD 是否作为新的 Thing generation 使用。
+从这一刻开始，问题已经不再只是 TD 的存放和发现，而是运行时生命周期管理。
 
-这些生命周期问题会在后续运行时架构文章中继续讨论。
+这也是后续 ClinkZ-WoT 架构文章需要重点讨论的内容。
 
-## ClinkZ-WoT 把 Directory 放在哪一层
+## ClinkZ-WoT 为什么不实现 Directory 服务端？
 
-ClinkZ-WoT 是 WoT Runtime，不是完整物联网平台。
+ClinkZ-WoT 的定位是协议中立的 WoT Runtime，而不是完整物联网平台。
 
-active v5 架构明确区分：
+在 active v5 架构中，Directory 的职责被明确拆开：
 
 ```text
-Directory service
-  -> 保存、索引、查询和授权管理 TD
+Directory Service
+  -> 保存和索引 TD
+  -> 执行服务端查询
+  -> 处理授权、租户和存储策略
   -> 属于外部平台或独立服务
 
-ClinkZ-WoT Discovery client
-  -> 查询、发布、观察和解析远程 Directory
-  -> 返回带来源与版本信息的 TD document
+ClinkZ-WoT Discovery Client
+  -> 查询远程 Directory
+  -> 发布或更新 TD
+  -> 观察 Directory 变化
+  -> 解析返回的 TD Document
 
-ClinkZ-WoT consume path
-  -> 对获得的 TD 使用与手工输入 TD 相同的校验和规划流程
+ClinkZ-WoT Consume Path
+  -> 校验获得的 TD
+  -> 进入统一 planning 流程
+  -> 建立 ConsumedThing
 ```
 
-主项目 `docs/architecture/10-primary-data-flows.md` 规定：Discovery 产生带来源信息的 TD 文档，随后进入与应用直接提供 TD 相同的 consume admission 路径。
+这意味着构造一个 Servient 时，不会自动创建进程内 Directory。
 
-同时，`DIR-SCOPE-001` 明确要求：
+ClinkZ-WoT 也不负责：
 
-- 构造 Servient 不会自动创建一个进程内 Directory；
-- Runtime 不拥有 Directory 的存储、服务端查询、复制和多租户策略；
-- Directory 只作为远程客户端能力进入引擎边界。
+- Directory 数据库存储；
+- 服务端查询执行；
+- 多租户策略；
+- TD 索引；
+- Directory 复制；
+- 服务端 watch fan-out；
+- Directory 服务可用性。
 
-WP-500 进一步把目标范围限定为 client-only：负责 Directory 请求、分页、watch、publication、取消、资源边界和结果元数据，但不实现 Directory 服务与存储后端。
+运行时只负责客户端边界。
 
-必须说明当前状态：这一边界属于 active v5 已接受架构；WP-500 仍为计划工作，不能据此声称完整的新 Directory 客户端已经进入产品实现。
+无论 TD 来自：
 
-这种划分意味着，未来 ClinkZ 平台可以选择：
+- 应用直接传入；
+- 本地文件；
+- 网关；
+- TD Server；
+- Directory；
+- 其他发现机制；
 
-- 部署符合 W3C API 的独立 Thing Description Directory；
-- 对接已有 Directory；
-- 在简单系统中完全不部署 Directory；
-- 让应用直接传入 TD；
-- 让其他 Discovery 机制返回 TD。
+最终都应该进入相同的 TD 校验和消费流程。
 
-ClinkZ-WoT 只要求最终获得一份可以进入 consume 流程的 TD，而不强迫所有系统采用同一种元数据服务拓扑。
+这种边界允许不同系统自行选择拓扑：
+
+```text
+小型系统
+  -> 直接加载 TD，不部署 Directory
+
+边缘系统
+  -> 从网关获取 TD
+
+平台系统
+  -> 部署独立 Directory
+
+已有生态
+  -> 对接第三方 Directory
+```
+
+ClinkZ-WoT 不强迫所有系统采用同一种元数据基础设施。
+
+必须强调当前状态：这一客户端边界属于已接受的 active v5 设计，WP-500 仍处于 Planned 状态，不能据此声称新的完整 Directory 客户端已经进入产品实现。
 
 ## 总结
 
-1. TD 的实际来源可以是 Thing 自身、网关、边缘服务或平台。存量设备不需要原生支持 WoT，网关可以将现场协议映射为 Property、Action 和 Event，并为物理设备或聚合对象生成 TD。
-2. TD Server 负责提供一份已知 TD，Thing Description Directory 负责管理和查找一组 TD。Directory 保存的是接口元数据，通常不位于每一次设备调用和数据传输的路径上。
-3. 实际落地过程是：业务人员定义能力，集成人员建立现场映射，网关或平台生成具体 TD，Directory 可选地负责发现，Consumer 获取 TD 后再通过 Form 和 Protocol Binding 与真实 Thing 交互。
+第一，现场设备不需要原生支持 WoT。业务人员定义 Thing 能力，集成人员建立现场点位映射，网关或平台可以为存量设备和聚合对象生成并托管 TD。
 
-理解了 TD 在系统中的流转方式，下一篇才能继续深入一个更具体的问题：同一个 Thing 的同一项能力同时拥有 HTTP、MQTT、CoAP 或 Zenoh Form 时，Runtime 与 Protocol Binding 应该怎样执行。
+第二，TD Server 提供一份已知 TD，Directory 管理和查找一组 TD。Directory 保存的是接口元数据，通常不位于实际设备交互的数据路径中。
+
+第三，从设备接入到应用调用的完整过程是：定义业务能力、建立现场映射、生成具体 TD、可选地注册到 Directory，再由 Consumer Servient 消费 TD，并通过 Form 与 Protocol Binding 执行真实通信。
+
+理解 TD 从哪里来、保存在哪里以及如何被找到之后，下一个问题才真正浮现出来：
+
+> 同一个 Thing 的同一项能力同时提供 HTTP、MQTT、CoAP 或 Zenoh Form 时，Runtime 到底应该选择哪一个，又由谁执行？
 
 ## 延伸阅读
 
 - 上一篇：[重新理解 WoT | W3C WoT 到底解决什么问题？](./001-what-does-wot-solve.md)
-- 下一篇：重新理解 WoT | 同一个 Thing 如何通过不同协议交互（计划中）
-- 后续主题：重新理解 WoT | WoT Directory 是什么，为什么 Runtime 不应实现 Directory 服务
-- 相关项目规范：ClinkZ-WoT `docs/architecture/10-primary-data-flows.md`
+- 下一篇：重新理解 WoT | 同一个 Thing 如何通过不同协议交互
+- 相关规范：ClinkZ-WoT `docs/architecture/10-primary-data-flows.md`
 - 相关工作包：ClinkZ-WoT `docs/work-packages/WP-500-discovery.md`
 
 ## 项目资料
 
-- ClinkZ-WoT commit: `f453f165c2ea775e5f0d10c36f1e419fcc1d79f3`
+- ClinkZ-WoT commit：`30485b1a51470f328e79453ba0e82e3358c14f79`
 - `td/src/lib.rs`
 - `td/src/thing.rs`
 - `td/src/thing_model.rs`
@@ -716,22 +893,21 @@ ClinkZ-WoT 只要求最终获得一份可以进入 consume 流程的 TD，而不
 内部事实分类：
 
 - TD、Thing Model、TD Server、Thing Description Directory、Consumer、Intermediary 和 Discovery 流程：外部标准事实。
-- 泵站、角色分工、点位映射和部署图：CONCEPTUAL COMPOSITE，用于说明常见工程协作，不声称对应某个具体项目。
-- ClinkZ-WoT td crate 的 TD/TM 数据结构、序列化、校验与扩展保留：IMPLEMENTED。
-- Discovery 结果进入统一 consume admission、Servient 不隐式创建 Directory、Directory client-only 边界：ACCEPTED_DESIGN。
-- WP-500 Directory and Discovery Client Runtime：PLANNED，尚未完成迁移。
+- 泵站、人员分工、点位映射和部署图：CONCEPTUAL COMPOSITE，用于说明常见工程协作，不声称对应某个具体项目。
+- ClinkZ-WoT TD/TM 数据结构、序列化、校验与扩展成员保留：IMPLEMENTED。
+- Discovery 结果进入统一 consume path、Servient 不隐式创建 Directory、Directory client-only：ACCEPTED_DESIGN。
+- WP-500 Directory and Discovery Client Runtime：PLANNED。
 
 发布前检查：
 
-- [x] 已读取主项目 PROJECT_STATE.md、Primary Data Flows 与 WP-500
-- [x] 已检查 W3C Architecture 1.1、TD 1.1 与 Discovery
-- [x] 已记录完整 commit
+- [x] 已与第一篇划分内容边界
+- [x] 已区分 Thing Model 与具体 TD
 - [x] 已区分 TD Server、Directory、Gateway 与 Runtime
-- [x] 未把 Directory 写成设备数据总线
-- [x] 未要求业务人员理解现场协议或手写完整 TD
+- [x] 未把 Directory 描述成设备数据总线
+- [x] 未要求现场设备原生支持 WoT
 - [x] 已区分 ClinkZ-WoT accepted design 与当前实现
 - [ ] 完成作者理解校验
 - [ ] 完成第二轮技术事实校验
-- [ ] 压缩知乎版本篇幅和重复解释
+- [ ] 制作泵站接入流程图
 - [ ] 回填知乎发布信息
 -->
