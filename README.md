@@ -63,34 +63,38 @@
 
 0. [专栏导读：从零开发一个 Rust WoT 引擎](./articles/00-column-guide.md)
 
-### 第一部分：理解 WoT
+### 第一部分：重新理解 WoT
 
 1. [W3C WoT 到底解决什么问题？](./articles/01-wot-foundations/001-what-does-wot-solve.md)
-2. [TD、网关与 Directory 在真实系统中如何协作](./articles/01-wot-foundations/002-td-gateway-directory-in-practice.md)
-3. 同一个 Thing 如何通过不同协议交互
-4. 一个 Thing 有多个 Form 时，运行时如何选择
+2. [现场设备不支持 WoT，Thing Description 从哪里来？](./articles/01-wot-foundations/002-td-gateway-directory-in-practice.md)
 
-### 第二部分：理解 ClinkZ-WoT
+第一部分只负责建立必要的概念基础。完成这两篇后，直接进入 Runtime 架构，不再单独围绕 Form 与多协议重复解释基础概念。
 
-1. 从 TD 到一次属性读取
+### 第二部分：理解 ClinkZ-WoT 架构
+
+1. [我心目中的完整 WoT 引擎](./articles/02-runtime-architecture/001-my-ideal-complete-wot-engine.md)
 2. 为什么 WoT Runtime 需要预编译执行计划
-3. Logical Plan 与 Binding Artifact
+3. Logical Plan 与 Binding Artifact：协议中立如何落地
 4. Servient 为什么必须成为运行时权威
 5. Protocol Binding 为什么不能直接调用 Handler
+6. 为什么 V1 放弃动态插件，选择 Cargo 静态链接
+7. 一个 ProducedThing 的暴露为什么需要事务
 
 ### 第三部分：理解 Rust 运行时约束
 
-1. 异步取消不等于 Drop Future
-2. 为什么外部回调必须在锁外执行
-3. Subscription 为什么不应该 Clone
-4. 为什么所有队列、缓存和后台工作都必须有上限
+1. Generation 如何阻止异步旧结果破坏新状态
+2. 为什么所有队列、缓存和后台工作都必须有上限
+3. 异步取消不等于 Drop Future
+4. 为什么外部回调必须在锁外执行
+5. Subscription 为什么不应该 Clone
 
 ### 第四部分：理解 AI 工程协作
 
-1. 聊天记录不是项目记忆
-2. AGENTS、PLAN 和 PROJECT_STATE 各自负责什么
-3. 如何避免 AI 在大型项目中反复重做架构
-4. 如何把复杂重构拆成可验证的 Work Package DAG
+1. 我如何用 AI 推进一个复杂 Rust 架构项目
+2. 聊天记录不是项目记忆
+3. AGENTS、PLAN 和 PROJECT_STATE 各自负责什么
+4. 如何避免 AI 在大型项目中反复重做架构
+5. 如何把复杂重构拆成可验证的 Work Package DAG
 
 完整选题和顺序见 [CONTENT_PLAN.md](./CONTENT_PLAN.md)。
 
@@ -146,8 +150,7 @@
 5. ClinkZ-WoT 当前选择了什么边界，为什么？
 6. 该选择如何落实到 Rust 类型、模块、生命周期或数据流？
 
-文章不以堆砌术语为目标。真正有价值的是呈现设计冲突、失败路径、取舍和
-验证过程。
+文章不以堆砌术语为目标。真正有价值的是呈现设计冲突、失败路径、取舍和验证过程。
 
 ## 发布渠道
 
@@ -155,5 +158,4 @@
 - 知乎：面向中文读者发布和讨论；
 - 其他平台：后续可从同一份 Markdown 源稿同步。
 
-知乎发布后，应将文章链接、发布日期和对应的 ClinkZ-WoT commit 回填到
-文章元数据中。
+知乎发布后，应将文章链接、发布日期和对应的 ClinkZ-WoT commit 回填到文章元数据中。
