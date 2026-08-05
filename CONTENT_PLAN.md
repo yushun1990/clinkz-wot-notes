@@ -11,140 +11,105 @@ ClinkZ-WoT 的开发计划。
 
 > ClinkZ-WoT 的架构、实现与 AI 协作开发实录
 
-## 第一季：建议优先完成的 12 篇
+## 第一季：优先完成的 12 篇
 
 | ID | 标题 | 系列 | 状态 |
 |---|---|---|---|
 | WOT-001 | W3C WoT 到底解决什么问题？ | 重新理解 WoT | DRAFTING |
-| WOT-002 | TD、网关与 Directory 在真实系统中如何协作 | 重新理解 WoT | DRAFTING |
-| WOT-003 | 同一个 Thing 如何通过不同协议交互 | 重新理解 WoT | IDEA |
-| ARCH-001 | 从 TD 到一次属性读取：ClinkZ-WoT 的完整执行链 | 运行时架构 | IDEA |
-| ARCH-002 | 为什么 WoT Runtime 需要预编译执行计划 | 运行时架构 | IDEA |
-| ARCH-003 | Logical Plan 与 Binding Artifact：协议中立如何落地 | 运行时架构 | IDEA |
-| ARCH-004 | Servient 为什么必须成为运行时权威 | 运行时架构 | IDEA |
-| ARCH-005 | Protocol Binding 为什么不能直接调用 Handler | 运行时架构 | IDEA |
-| ARCH-006 | 为什么 V1 放弃动态插件，选择 Cargo 静态链接 | 运行时架构 | IDEA |
+| WOT-002 | 现场设备不支持 WoT，Thing Description 从哪里来？ | 重新理解 WoT | DRAFTING |
+| ARCH-001 | 我心目中的完整 WoT 引擎 | ClinkZ-WoT 架构设计 | DRAFTING |
+| ARCH-002 | 为什么 WoT Runtime 需要预编译执行计划 | ClinkZ-WoT 架构设计 | IDEA |
+| ARCH-003 | Logical Plan 与 Binding Artifact：协议中立如何落地 | ClinkZ-WoT 架构设计 | IDEA |
+| ARCH-004 | Servient 为什么必须成为运行时权威 | ClinkZ-WoT 架构设计 | IDEA |
+| ARCH-005 | Protocol Binding 为什么不能直接调用 Handler | ClinkZ-WoT 架构设计 | IDEA |
+| ARCH-006 | 为什么 V1 放弃动态插件，选择 Cargo 静态链接 | ClinkZ-WoT 架构设计 | IDEA |
+| ARCH-007 | 一个 ProducedThing 的暴露为什么需要事务 | ClinkZ-WoT 架构设计 | IDEA |
 | RUST-001 | Generation 如何阻止异步旧结果破坏新状态 | Rust 运行时 | IDEA |
 | RUST-002 | 为什么所有队列、缓存和后台工作都必须有上限 | Rust 运行时 | IDEA |
 | AI-001 | 我如何用 AI 推进一个复杂 Rust 架构项目 | AI 工程 | IDEA |
 
-推荐从 `WOT-001` 开始：先建立 WoT 的现实问题空间，再理解 TD 在设备、
-网关、Directory 和 Consumer 之间如何流转，之后进入 Form、Protocol Binding
-与运行时执行。
+推荐从 `WOT-001` 开始：先理解 WoT 的现实问题空间，再理解 TD 如何进入真实系统；完成这两篇基础文章后，直接进入 ClinkZ-WoT 的总体运行时架构，不再在基础系列中重复拆解 Form 与多协议概念。
 
 ---
 
 ## 系列一：重新理解 WoT
 
+这一系列只负责建立进入运行时架构前所需的概念基础。第一季保留两篇，不再继续围绕 Form、多协议和 Runtime 名词单独扩展基础文章。
+
 ### WOT-001｜W3C WoT 到底解决什么问题？
 
-核心问题：
+核心内容：
 
 - 真实系统为什么自然形成多协议、多厂商和多接口边界；
 - 统一 MQTT 或 HTTP 为什么仍不能统一能力和交互语义；
 - WoT 为什么不是另一种通信协议；
-- TD、Form、Protocol Binding 与 WoT Runtime 如何协作；
+- TD、Interaction Affordance、Form 与 Protocol Binding 的基本关系；
 - ClinkZ-WoT 为什么选择从 TD 开始，而不是从某个具体协议开始。
 
 当前稿件：
 
 - `articles/01-wot-foundations/001-what-does-wot-solve.md`
 
-### WOT-002｜TD、网关与 Directory 在真实系统中如何协作
+### WOT-002｜现场设备不支持 WoT，Thing Description 从哪里来？
 
-核心问题：
+核心内容：
 
 - 业务、工艺、设备集成和平台开发人员分别负责什么；
-- Thing Model 如何先描述一类 Thing 的业务能力；
-- 现场协议和点位如何由网关映射为 Property、Action 与 Event；
+- Thing Model 如何描述一类 Thing 的稳定能力；
+- 现场协议和点位如何映射为 Property、Action 与 Event；
 - 存量设备为什么不需要原生支持 WoT；
+- 网关如何代理、聚合并暴露 Thing；
 - TD 可以由设备、网关或平台托管；
 - TD Server 与 Thing Description Directory 的区别；
-- Directory 为什么不是消息总线，也不是每次设备交互的必经节点；
-- Consumer 如何从发现 TD 走到创建 ConsumedThing 和执行交互；
-- ClinkZ-WoT 为什么只拥有 Directory 客户端边界，而不实现 Directory 服务。
+- Consumer 如何从发现 TD 走到消费 Thing。
 
 当前稿件：
 
 - `articles/01-wot-foundations/002-td-gateway-directory-in-practice.md`
 
-### WOT-003｜同一个 Thing 如何通过不同协议交互
-
-核心问题：
-
-- 同一项 Property、Action 或 Event 如何拥有多个 Form；
-- Protocol Binding 如何把 Interaction Affordance 映射到具体协议消息；
-- HTTP URL、MQTT Topic、CoAP resource 与 Zenoh key expression 为什么属于协议层；
-- 协议中立为什么不等于抹平 QoS、流控和交互方式差异；
-- 应用、WoT Runtime 与 Binding 分别应该知道什么。
-
-### WOT-004｜一个 Thing 同时提供多个 Form，客户端应该选哪个
-
-核心问题：
-
-- operation；
-- security；
-- binding availability；
-- policy；
-- candidate fallback；
-- 为什么选择结果必须进入 Plan。
-
-### WOT-005｜ConsumedThing 与 ProducedThing：相同语义，不同生命周期
-
-核心问题：
-
-- 消费远程 Thing；
-- 对外暴露本地 Thing；
-- 为什么 producer 暴露涉及外部副作用和事务性激活。
-
-### WOT-006｜WoT Directory 是什么，为什么 Runtime 不应实现 Directory 服务
-
-核心问题：
-
-- Discovery client 与 Directory service；
-- Directory 存储、索引、查询、授权和多租户边界；
-- Directory revision、watch、publication 和分页；
-- 为什么这些服务端职责属于平台层，而不是 Runtime 内核。
-
 ---
 
-## 系列二：ClinkZ-WoT 运行时架构
+## 系列二：ClinkZ-WoT 架构设计
 
-### ARCH-001｜从 TD 到一次属性读取：完整执行链
+这一系列从 W3C WoT 的外部语义进入 Runtime 内部设计。第一篇先给出总体能力地图，后续文章再逐项放大 Planning、Binding、Servient、生命周期和部署边界。
 
-```text
-TD
- -> parse and validate
- -> PlanningContext
- -> Logical Plan
- -> Binding Artifact
- -> Compiled Plan Set
- -> OutboundRequest
- -> Binding
- -> response validation
- -> application
-```
+### ARCH-001｜我心目中的完整 WoT 引擎
+
+核心内容：
+
+- W3C WoT 规范定义了什么，哪些内部结构仍必须由实现者设计；
+- TD、消费、暴露、发现、Planning、Binding、安全和生命周期如何组成一个完整 Runtime；
+- 为什么“完整”不等于支持更多协议，而是权责和生命周期闭合；
+- 声明式描述与可执行结构、协议中立与协议真实性之间的矛盾；
+- ProducedThing 的外部副作用；
+- generation、取消、迟到结果与失败清理；
+- Host 与 `no_std + alloc` 如何保持相同语义。
+
+当前稿件：
+
+- `articles/02-runtime-architecture/001-my-ideal-complete-wot-engine.md`
 
 ### ARCH-002｜为什么 WoT Runtime 需要预编译执行计划
 
 - 热路径解释 TD 的代价；
-- form、security、schema 和 media decision；
-- 编译期错误与运行期错误；
+- `base`、operation、security、schema 和 media 决策；
+- 构建阶段错误与执行阶段错误；
 - immutable plan；
 - 这里的“编译”为什么不是 Cargo build。
 
 ### ARCH-003｜Logical Plan 与 Binding Artifact：协议中立如何落地
 
-- 哪些决定属于协议中立；
+- 哪些执行事实属于协议中立层；
 - 哪些产物必须由具体 Binding 拥有；
-- HTTP method/URL、Zenoh key expression、MQTT topic 的边界。
+- HTTP method/URL、Zenoh key expression、MQTT topic 的边界；
+- Binding Compiler 为什么不能重新选择 Form。
 
-### ARCH-004｜Servient 为什么必须成为运行时唯一编排者
+### ARCH-004｜Servient 为什么必须成为运行时权威
 
-- 谁拥有 registry；
-- 谁选择 Handler；
-- 谁管理 admission、generation、cancellation 和 cleanup；
-- 为什么 Binding 不能持有通用 dispatch authority。
+- 谁拥有 Binding registry；
+- 谁拥有 ConsumedThing 与 ProducedThing generation；
+- 谁管理 admission、路由、取消和 cleanup；
+- 为什么全局语义必须回到一个明确的编排权威。
 
 ### ARCH-005｜Protocol Binding 为什么不能直接调用 Handler
 
@@ -166,14 +131,22 @@ protocol frame
 - Cargo-linked Binding；
 - 重新构建与灰度发布。
 
-### ARCH-007｜build.rs 能不能实现 Rust 插件系统
+### ARCH-007｜一个 ProducedThing 的暴露为什么需要事务
+
+- prepare、ready、activate、commit；
+- committed-closed；
+- Servient-local atomic publication；
+- partial serving 风险；
+- rollback、pending cleanup 和 durable residual state。
+
+### ARCH-008｜build.rs 能不能实现 Rust 插件系统
 
 - Cargo 依赖解析发生在何时；
 - build script 的边界；
 - 为什么不能在 build.rs 中临时添加 crate dependency；
 - 平台管理器如何生成组合工程。
 
-### ARCH-008｜静态链接不等于不能动态扩展
+### ARCH-009｜静态链接不等于不能动态扩展
 
 ```text
 install binding
@@ -185,21 +158,13 @@ install binding
  -> switch traffic
 ```
 
-### ARCH-009｜一个 ProducedThing 的暴露为什么需要事务
-
-- prepare、ready、activate、commit；
-- committed-closed；
-- atomic publication；
-- partial serving 风险；
-- rollback 和 cleanup。
-
 ### ARCH-010｜Compiled Plan Set 生命周期：删除对象不等于资源已经释放
 
 - Building、Frozen、Published、Draining、Reclaimed；
 - call、route、subscription 和 late completion；
-- plan pin 与 cleanup owner。
+- plan pin、generation lease 与 cleanup owner。
 
-### ARCH-011｜Protocol Binding 是适配器，还是一个受约束的运行时组件
+### ARCH-011｜Protocol Binding 是适配器，还是受约束的运行时组件
 
 - compiler extension；
 - client call；
@@ -224,8 +189,7 @@ install binding
 
 ### RUST-002｜为什么所有队列、缓存和后台工作都必须有上限
 
-覆盖 unbounded channel、correlation map、subscription buffer、retry queue、
-ingress buffer、diagnostics，以及 host 与 constrained profile。
+覆盖 unbounded channel、correlation map、subscription buffer、retry queue、ingress buffer、diagnostics，以及 Host 与 constrained profile。
 
 ### RUST-003｜异步取消不是 Drop Future
 
@@ -264,7 +228,7 @@ under lock: revalidate generation and commit
 
 ### RUST-007｜no_std 不只是移除标准库
 
-- host async 与 caller-driven progress；
+- Host async 与 caller-driven progress；
 - static/dynamic bounded resources；
 - 相同语义、不同 progress mechanism；
 - async 不等于 Tokio。
@@ -299,7 +263,7 @@ under lock: revalidate generation and commit
 - ready queue；
 - round-robin cursor；
 - slow binding isolation；
-- host/manual runtime 一致性。
+- Host/manual runtime 一致性。
 
 ### RUST-012｜Fallible Cleanup：为什么 Drop 不能成为唯一清理协议
 
