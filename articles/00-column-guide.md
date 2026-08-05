@@ -7,14 +7,14 @@ series_order: 0
 status: "DRAFTING"
 author: "yushun1990"
 created: "2026-07-28"
-updated: "2026-07-29"
+updated: "2026-08-05"
 summary: "介绍《从零开发一个 Rust WoT 引擎》专栏的写作目标、内容结构、推荐阅读路线和文章更新规则。"
 
 clinkz_wot:
   repository: "https://github.com/yushun1990/clinkz-wot"
   branch: "master"
-  commit: "f453f165c2ea775e5f0d10c36f1e419fcc1d79f3"
-  inspected_at: "2026-07-29"
+  commit: "30485b1a51470f328e79453ba0e82e3358c14f79"
+  inspected_at: "2026-08-05"
 
 publication:
   platform: "zhihu"
@@ -28,6 +28,7 @@ related:
     - "WOT-001"
     - "WOT-002"
     - "ARCH-001"
+    - "ARCH-002"
     - "RUST-001"
     - "AI-001"
   docs:
@@ -51,7 +52,7 @@ related:
 
 我想把这个过程记录下来，主要有两个原因。
 
-第一，是向更多物联网开发者介绍 W3C Web of Things。WoT 并不是一种替代 MQTT、HTTP、CoAP 或 Zenoh 的新协议，而是一套建立在具体协议之上的 Thing 描述、交互模型与运行时编程方式。
+第一，是向更多物联网开发者介绍 W3C Web of Things。WoT 并不是一种替代 MQTT、HTTP、CoAP 或 Zenoh 的新协议，而是一套建立在具体协议之上的 Thing 描述、交互模型与运行时方式。
 
 第二，也是更重要的原因，是逼迫自己真正理解这个项目。能让 AI 生成一段代码，不等于掌握了这段代码；能接受一份架构设计，也不等于理解了设计背后的状态、生命周期、失败路径和取舍。
 
@@ -68,13 +69,11 @@ related:
 
 ClinkZ-WoT 希望实现一个以 [W3C Thing Description](https://www.w3.org/TR/wot-thing-description11/) 为语义入口、协议中立的 Rust WoT Runtime。
 
-真实的物联网系统通常不是一次建成的。存量控制器、现场协议、厂商网关、消息平台、Web API 和后来增加的边缘服务，可能在不同阶段进入同一个系统。多协议、多厂商和多接口长期共存，往往是设备寿命、网络条件、采购边界和系统演进共同造成的结果，而不是为了说明 WoT 人为拼出的场景。
+真实的物联网系统通常不是一次建成的。存量控制器、现场协议、厂商网关、消息平台、Web API 和后来增加的边缘服务，可能在不同阶段进入同一个系统。多协议、多厂商和多接口长期共存，往往是设备寿命、网络条件、采购边界和系统演进共同造成的结果。
 
 即使系统通过网关把通信统一为 MQTT 或 HTTP，应用仍然需要理解不同的 Topic、Payload、URL、数据含义、操作方式、错误模型和订阅语义。统一传输只能解决“消息怎样到达”的一部分问题，不能自动形成共同的设备能力模型。
 
-真正缺少的不是又一种通信协议，而是位于这些接口之上的、机器可读的 Thing 交互模型。
-
-WoT 尝试把几个层次分开：
+WoT 尝试把这些层次分开：
 
 ```text
 Thing Description
@@ -89,7 +88,7 @@ Form + Protocol Binding
 HTTP / MQTT / CoAP / Modbus / OPC UA / Zenoh / ...
 ```
 
-Thing Description 描述 Thing 能做什么，Protocol Binding 负责如何通过某种协议完成交互，而 Servient Runtime 负责把语义、策略、生命周期和协议执行组织起来。
+Thing Description 描述 Thing 能做什么，Protocol Binding 负责怎样通过某种协议完成交互，而 Servient Runtime 负责把语义、策略、生命周期和协议执行组织起来。
 
 ClinkZ-WoT 的目标，就是探索这套模型如何在 Rust 中落地，并同时兼顾：
 
@@ -102,51 +101,35 @@ ClinkZ-WoT 的目标，就是探索这套模型如何在 Rust 中落地，并同
 
 ## 这个专栏会写什么
 
-专栏暂时分为四条主线。它们并不是彼此独立的教程，而是从不同角度解释同一个运行时。
+专栏暂时分为四条主线。它们不是彼此独立的教程，而是从不同角度解释同一个运行时。
 
 ### 系列一：重新理解 WoT
 
-这一部分不会先给空调、传感器或控制器强行分配一种协议，再用虚构示例证明 WoT 的必要性。它会从真实系统为什么自然形成多协议、多厂商和多接口边界开始，继续追问 TD 在工程里究竟怎样产生、由谁托管、应用怎样发现，以及网关和 Directory 分别承担什么责任。
+这一部分只负责建立进入 Runtime 架构前必须具备的概念基础。
 
-会涉及：
+第一篇从真实系统为什么自然形成多协议、多厂商和多接口边界开始，说明统一 MQTT 或 HTTP 为什么仍不能形成共同的 Thing 接口，以及 W3C WoT 究竟在哪一层介入。
 
-- 存量设备、网络约束、采购边界和长期演进如何形成协议与接口碎片化；
-- 统一传输协议为什么不等于统一设备能力、数据含义和交互语义；
-- W3C WoT 为什么不是一种新协议，它试图建立什么共同接口；
-- 工艺人员、设备集成人员和平台开发者如何共同形成 Thing Model 与具体 TD；
-- 存量设备为什么不需要原生支持 WoT，网关如何代理、聚合并暴露虚拟 Thing；
-- TD 可以托管在设备、网关或平台，TD Server 与 Thing Description Directory 有什么区别；
-- Directory 为什么只负责 TD 的登记和发现，而不是设备消息总线；
-- Property、Action、Event、Data Schema 和 Form 如何描述 Thing 的能力与访问方式；
-- 同一个 Thing 如何通过不同协议或多个 Form 交互；
-- ConsumedThing、ProducedThing、Protocol Binding 与 Servient 分别承担什么责任；
-- 多个 Form 的选择、回退，以及 WoT Runtime 与 Directory、平台服务之间的边界。
+第二篇继续回答 TD 在工程中怎样产生：业务人员定义能力，集成人员完成现场映射，网关或平台形成具体 TD，并由设备、网关或 Directory 提供给 Consumer。
+
+完成这两篇后，第一阶段就暂时收束。Form、Protocol Binding、ConsumedThing 和 ProducedThing 不再作为孤立的概念文章反复解释，而是在后续 Runtime 架构中结合真实权责和生命周期继续展开。
 
 ### 系列二：ClinkZ-WoT 架构设计
 
-这一部分关注 ClinkZ-WoT 最核心的架构问题：一个 TD 如何变成真正可执行的交互。
+这一部分是专栏的主体。
 
-主线大致如下：
+第一篇不会立即钻进一次属性读取的调用链，而是先给出总体地图：从 W3C WoT 规范出发，一个完整 Runtime 应该具备哪些能力，规范定义的外部语义怎样转化为 TD、消费、暴露、发现、Planning、Binding、安全和生命周期边界。
 
-```text
-Thing Description
-  -> parse and validate
-  -> PlanningContext
-  -> Logical Plan
-  -> Binding Artifact
-  -> Compiled Plan Set
-  -> runtime interaction
-```
+后续文章再逐项展开：
 
-会重点讨论：
-
-- 为什么运行时需要预编译执行计划；
-- Logical Plan 与 Binding Artifact 如何划分协议中立边界；
-- Servient 为什么必须成为运行时编排权威；
+- 为什么 Runtime 需要预编译执行计划；
+- Logical Plan 与 Binding Artifact 怎样划分协议中立边界；
+- Servient 为什么必须成为运行时权威；
 - Protocol Binding 为什么不能绕过 Servient 直接调用 Handler；
-- ProducedThing 的暴露为什么需要事务性激活；
-- Compiled Plan Set 如何进入 draining 和 reclaim；
+- ProducedThing 的暴露为什么需要事务性生命周期；
+- Compiled Plan Set 怎样进入 draining 和 reclaim；
 - 为什么 V1 选择 Cargo 静态链接，而不是直接实现动态插件。
+
+这一系列关注的不是“代码经过了哪些函数”，而是每项事实由谁解释、每种状态由谁拥有、失败以后由谁继续完成清理。
 
 ### 系列三：Rust 运行时机制
 
@@ -179,50 +162,50 @@ ClinkZ-WoT 的开发大量使用了 AI，但这个系列不会把“使用 AI”
 
 ## 第一季文章地图
 
-第一季先收录当前已经规划的 12 篇文章。文章按系列分组，编号采用“系列号.系列内序号”；知乎专栏没有二层目录，因此系列名称会直接作为正式文章标题的前缀。后续文章将在写作推进过程中逐步加入新的季度或扩展现有系列。
+第一季优先完成 12 篇文章。文章按系列分组，编号采用“系列号.系列内序号”；知乎专栏没有二层目录，因此系列名称会直接作为正式文章标题的前缀。
 
 ### 系列一：重新理解 WoT
 
-**1.1**　[**重新理解 WoT | W3C WoT 到底解决什么问题？**](./01-wot-foundations/001-what-does-wot-solve.md)（撰写中）  
+**1.1**　[**重新理解 WoT｜W3C WoT 到底解决什么问题？**](./01-wot-foundations/001-what-does-wot-solve.md)（撰写中）  
 真实系统为什么会自然形成多协议、多接口边界，统一 MQTT 或 HTTP 为什么仍然不够，以及 WoT 在哪一层介入。
 
-**1.2**　[**重新理解 WoT | TD、网关与 Directory 在真实系统中如何协作**](./01-wot-foundations/002-td-gateway-directory-in-practice.md)（撰写中）  
-业务能力怎样变成具体 TD，存量设备如何由网关代理，应用又怎样通过 Directory 找到并消费 Thing。
-
-**1.3**　**重新理解 WoT | 同一个 Thing 如何通过不同协议交互**（计划中）  
-Interaction Affordance、Form 与 Protocol Binding 如何分工。
+**1.2**　[**重新理解 WoT｜现场设备不支持 WoT，Thing Description 从哪里来？**](./01-wot-foundations/002-td-gateway-directory-in-practice.md)（撰写中）  
+业务能力怎样变成具体 TD，存量设备如何由网关代理，应用又怎样发现并消费 Thing。
 
 ### 系列二：ClinkZ-WoT 架构设计
 
-**2.1**　**ClinkZ-WoT 架构设计 | 从 TD 到一次属性读取：ClinkZ-WoT 的完整执行链**（计划中）  
-一次调用如何穿过规划、Binding 和运行时。
+**2.1**　[**ClinkZ-WoT 架构｜我心目中的完整 WoT 引擎**](./02-runtime-architecture/001-my-ideal-complete-wot-engine.md)（撰写中）  
+从 W3C WoT 的外部语义出发，给出 TD、消费、暴露、发现、Planning、Binding、安全与生命周期的总体能力地图。
 
-**2.2**　**ClinkZ-WoT 架构设计 | 为什么 WoT Runtime 需要预编译执行计划**（计划中）  
-为什么不能在每次调用时重新解释 TD。
+**2.2**　**ClinkZ-WoT 架构｜为什么 WoT Runtime 需要预编译执行计划**（计划中）  
+为什么不能在每次调用时重新解释 TD，以及执行前应冻结哪些事实。
 
-**2.3**　**ClinkZ-WoT 架构设计 | Logical Plan 与 Binding Artifact：协议中立如何落地**（计划中）  
-哪些决定属于 Core，哪些属于 Binding。
+**2.3**　**ClinkZ-WoT 架构｜Logical Plan 与 Binding Artifact：协议中立如何落地**（计划中）  
+哪些决定属于共享 Runtime，哪些协议数据只能由具体 Binding 生成。
 
-**2.4**　**ClinkZ-WoT 架构设计 | Servient 为什么必须成为运行时权威**（计划中）  
-谁拥有路由、生命周期和状态迁移权。
+**2.4**　**ClinkZ-WoT 架构｜Servient 为什么必须成为运行时权威**（计划中）  
+谁拥有注册表、计划、路由、generation、取消与清理。
 
-**2.5**　**ClinkZ-WoT 架构设计 | Protocol Binding 为什么不能直接调用 Handler**（计划中）  
-如何避免协议组件获得隐藏的执行权。
+**2.5**　**ClinkZ-WoT 架构｜Protocol Binding 为什么不能直接调用 Handler**（计划中）  
+怎样避免协议组件获得隐藏的应用执行权。
 
-**2.6**　**ClinkZ-WoT 架构设计 | 为什么 V1 放弃动态插件，选择 Cargo 静态链接**（计划中）  
-Rust ABI、异步边界和插件卸载有什么代价。
+**2.6**　**ClinkZ-WoT 架构｜为什么 V1 放弃动态插件，选择 Cargo 静态链接**（计划中）  
+Rust ABI、异步边界和插件卸载会把复杂度放在哪里。
+
+**2.7**　**ClinkZ-WoT 架构｜一个 ProducedThing 的暴露为什么需要事务**（计划中）  
+多个协议路由怎样准备、激活、发布、回滚并最终清理。
 
 ### 系列三：Rust 运行时机制
 
-**3.1**　**Rust 运行时机制 | Generation 如何阻止异步旧结果破坏新状态**（计划中）  
-late completion 如何污染新一代资源。
+**3.1**　**Rust 运行时机制｜Generation 如何阻止异步旧结果破坏新状态**（计划中）  
+late completion 怎样污染新一代资源。
 
-**3.2**　**Rust 运行时机制 | 为什么所有队列、缓存和后台工作都必须有上限**（计划中）  
-如何避免隐藏的无界资源增长。
+**3.2**　**Rust 运行时机制｜为什么所有队列、缓存和后台工作都必须有上限**（计划中）  
+怎样避免隐藏的无界资源增长。
 
 ### 系列四：人与 AI 共同开发大型 Rust 项目
 
-**4.1**　**人与 AI 共同开发大型 Rust 项目 | 我如何用 AI 推进一个复杂 Rust 架构项目**（计划中）  
+**4.1**　**人与 AI 共同开发大型 Rust 项目｜我如何用 AI 推进一个复杂 Rust 架构项目**（计划中）  
 如何让 AI 参与工程，而不是只生成代码。
 
 ## 推荐阅读路线
@@ -233,15 +216,15 @@ late completion 如何污染新一代资源。
 真实系统的协议与接口碎片化
   -> WoT 的问题空间
   -> TD、网关与 Directory 的实际协作
-  -> Form 与 Protocol Binding
-  -> ClinkZ-WoT 架构设计
+  -> 我心目中的完整 WoT 引擎
+  -> Planning、Binding 与 Servient 专题
   -> Rust 运行时机制
   -> 人与 AI 共同开发大型 Rust 项目
 ```
 
-已经熟悉 WoT、主要关注运行时架构，可以从“ClinkZ-WoT 架构设计 | 从 TD 到一次属性读取：ClinkZ-WoT 的完整执行链”开始，再阅读 Logical Plan、Binding Artifact、Servient 和 Protocol Binding 相关内容。
+已经熟悉 WoT、主要关注 Runtime，可以直接从“ClinkZ-WoT 架构｜我心目中的完整 WoT 引擎”开始。它是第二阶段的总纲，后续文章会放大其中的 Planning、Binding、Servient、ProducedThing 和生命周期节点。
 
-主要关注 Rust 异步设计，可以直接阅读 generation、取消、锁外执行、Subscription 和资源预算等文章，但建议先了解 ClinkZ-WoT 的基本执行链，否则其中很多类型约束会显得没有必要。
+主要关注 Rust 异步设计，可以直接阅读 generation、取消、锁外执行、Subscription 和资源预算等文章，但建议先看架构总纲，否则很多类型约束会显得没有必要。
 
 正在尝试使用 AI 推进长期项目，可以先阅读“人与 AI 共同开发大型 Rust 项目”系列。这个部分不会讨论“哪个提示词最厉害”，而会关注项目记忆、证据、决策边界、计划维护和验证机制。
 
@@ -272,7 +255,7 @@ ClinkZ-WoT 仍在开发中。为了避免把设计愿景误写成已经实现的
 - 为了 V1 可交付性主动放弃的能力；
 - AI 与开发者意见不一致时，最终如何通过证据收敛。
 
-这些过程有时比最终代码更有价值。因为真正决定一个运行时是否可靠的，往往不是某个漂亮的 trait，而是谁拥有状态、谁推动生命周期、失败后谁负责清理，以及这些规则能否被测试和文档共同证明。
+这些过程有时比最终代码更有价值。真正决定一个运行时是否可靠的，往往不是某个漂亮的 trait，而是谁拥有状态、谁推动生命周期、失败后谁负责清理，以及这些规则能否被测试和文档共同证明。
 
 ## 项目与文章仓库
 
@@ -291,6 +274,6 @@ ClinkZ-WoT 仍在开发中。为了避免把设计愿景误写成已经实现的
 
 这篇导读会长期更新，也会成为整个专栏的入口。
 
-下一篇将从最基础的问题开始：
+第一阶段从下面这篇文章开始：
 
-> 重新理解 WoT | W3C WoT 到底解决什么问题？
+> 重新理解 WoT｜W3C WoT 到底解决什么问题？
