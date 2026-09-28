@@ -273,6 +273,14 @@ under lock: revalidate generation and commit
 - terminal disposition；
 - Drop 只能是兜底。
 
+### RUST-013｜为什么已验证的 TD 不再需要 BTreeMap：三个 Arena 与可核算的内存所有权
+
+- 状态：DRAFTING；独立专题草稿，不影响第一季优先顺序。
+- 源稿：[为什么已验证的 TD 不再需要 BTreeMap](articles/03-rust-runtime/013-why-validatedthing-uses-arenas.md)。
+- 问题：Thing 的动态树形容器为何不适合直接承诺受限环境下的完整资源峰值。
+- 解释三保留 / 四临时 Arena、键排序和有序序列的语义区别、构建与封存峰值、为何仍保留编辑用 BTreeMap。
+- 必须区分 WP-100 已接受设计、非生产原型证据和生产实现尚未准入的部分。
+
 ---
 
 ## 系列四：人与 AI 的工程协作
