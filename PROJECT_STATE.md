@@ -1,6 +1,6 @@
 # Writing Project State
 
-Last updated: 2026-07-29
+Last updated: 2026-09-28
 
 ## Current Objective
 
@@ -152,3 +152,16 @@ The rewritten WOT-002 currently covers:
 6. WOT-001；
 7. WOT-002；
 8. ClinkZ-WoT 主项目最新状态。
+
+
+## 并行技术文章：RUST-013（三 Arena）
+
+记录日期：2026-09-28。本节是并行专题的写作连续状态，**不表示 WOT-001 / WOT-002 已发布或原有主线已经完成**。
+
+- 文章：`RUST-013｜为什么已验证的 TD 不再需要 BTreeMap：三个 Arena 与可核算的内存所有权`。
+- 位置：`articles/03-rust-runtime/013-why-validatedthing-uses-arenas.md`；状态：`DRAFTING`。
+- 已做：按最新主项目正式 WP-100 准入设计、现有 Thing 数据模型、三保留 / 四临时 Arena 非生产原型、typed snapshot 与局部共享语义测试组织完整的专题初稿，并在 CONTENT_PLAN / Rust 系列索引中登记。
+- 主项目固定基线：`3c37240e4b94edc335a46d33a2a81003e4e0fc01`（2026-09-28）。
+- 结论边界：Arena 布局是 `ACCEPTED_DESIGN`；三 Arena 布局/封存原型及字段覆盖是局部 `IMPLEMENTED` 测试证据；生产 `ValidatedThing` 仍未获该 tranche 准入，不能声称完整运行时效果、跨平台测量或完整资源证明。
+- 作者理解校验：已有关于 Arena 与 BTreeMap 分工的交流，但**正式文章审稿与发布前事实校验仍未完成**。
+- 后续：作者审阅文章主线与示意图；必要时补充资源申请/封存失败的源码级展开；主项目进一步推进后对照本文基线检查 URI 和完整语义核；发布知乎前回填 canonical URL、发布日期与状态。

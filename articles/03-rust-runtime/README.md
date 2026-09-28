@@ -14,6 +14,10 @@
 - host async 和 `no_std + alloc` manual progress；
 - fallible cleanup。
 
+## 草稿
+
+- [RUST-013｜为什么已验证的 TD 不再需要 BTreeMap：三个 Arena 与可核算的内存所有权](./013-why-validatedthing-uses-arenas.md)（DRAFTING，基于主项目 3c37240e4b94）。
+
 ## 写作要求
 
 每篇文章至少提供：
